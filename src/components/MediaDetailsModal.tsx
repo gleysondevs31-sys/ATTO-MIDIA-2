@@ -1,6 +1,7 @@
 import React from "react";
-import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2, Heart } from "lucide-react";
+import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2, Heart, Share2 } from "lucide-react";
 import { NormalizedMedia } from "../types";
+import { useToast } from "./Toast";
 
 interface MediaDetailsModalProps {
   media: NormalizedMedia | null;
@@ -12,6 +13,19 @@ interface MediaDetailsModalProps {
 
 export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false, onToggleFavorite }: MediaDetailsModalProps) {
   if (!media) return null;
+  const { toast } = useToast();
+
+  const handleShare = () => {
+    if (!media.originalUrl) return;
+    navigator.clipboard.writeText(media.originalUrl)
+      .then(() => {
+        toast.success("Link copiado!", "O link original da mídia foi copiado para a área de transferência.");
+      })
+      .catch((err) => {
+        console.error("Falha ao copiar link:", err);
+        toast.error("Erro ao compartilhar", "Não foi possível copiar o link.");
+      });
+  };
 
   const playAudio = () => {
     onPlay({
@@ -105,6 +119,17 @@ export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false,
               </div>
               
               <div className="flex items-center gap-2.5 shrink-0">
+                {media.originalUrl && (
+                  <button
+                    id="btn-modal-share-cta"
+                    onClick={handleShare}
+                    title="Compartilhar Mídia"
+                    className="p-4 rounded-full border bg-black/60 border-white/10 text-gray-400 hover:text-white hover:border-white/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                  >
+                    <Share2 className="w-6 h-6" />
+                  </button>
+                )}
+
                 {onToggleFavorite && (
                   <button
                     id="btn-modal-favorite-cta"
@@ -220,6 +245,7 @@ export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false,
                         download={`${media.title} - Audio.mp3`}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={() => toast.success("Download iniciado", `Preparando o áudio de '${media.title}' via proxy...`)}
                         className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-sm cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -265,6 +291,7 @@ export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false,
                             download={`${media.title} - Video.mp4`}
                             target="_blank"
                             rel="noreferrer"
+                            onClick={() => toast.success("Download iniciado", `Preparando o vídeo de '${media.title}' via proxy...`)}
                             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-xl transition-all shadow-sm cursor-pointer"
                           >
                             <Download className="w-3.5 h-3.5" />

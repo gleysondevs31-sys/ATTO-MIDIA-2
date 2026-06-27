@@ -73,6 +73,36 @@ export async function bootstrapDatabase() {
     `);
     console.log("[DB] 'search_history' table verified/created.");
 
+    // 4. Create Platforms Config Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS platforms_config (
+        id SERIAL PRIMARY KEY,
+        platform_key VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        icon_name VARCHAR(50) DEFAULT 'Music',
+        primary_api_url TEXT NOT NULL,
+        fallback_api_url TEXT,
+        api_key_override VARCHAR(255),
+        is_enabled BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] 'platforms_config' table verified/created.");
+
+    // Seed default platforms if empty
+    const platformsCount = await client.query("SELECT COUNT(*) FROM platforms_config");
+    if (parseInt(platformsCount.rows[0].count) === 0) {
+      console.log("[DB] Seeding default platforms into 'platforms_config'...");
+      await client.query(`
+        INSERT INTO platforms_config (platform_key, name, icon_name, primary_api_url, fallback_api_url) VALUES
+        ('youtube', 'YouTube', 'Youtube', '/api/media/yt-download', 'https://zero-two-apis.com.br/api/dl/multidl'),
+        ('soundcloud', 'Soundcloud', 'Music', 'https://zero-two-apis.com.br/api/soundcloud/search', 'https://fallback-apis.com/api/soundcloud/search'),
+        ('spotify', 'Spotify', 'Music', 'https://zero-two-apis.com.br/api/spotify/search', 'https://fallback-apis.com/api/spotify/search'),
+        ('tiktok', 'TikTok', 'Play', 'https://zero-two-apis.com.br/api/download/tiktok/v4', 'https://zero-two-apis.com.br/api/dl/multidl')
+      `);
+      console.log("[DB] Seeding completed!");
+    }
+
     console.log("[DB] Database auto-bootstrap completed successfully!");
   } catch (error: any) {
     console.error("[DB] Database auto-bootstrap failed:", error.message);

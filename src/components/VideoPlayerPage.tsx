@@ -20,6 +20,7 @@ import {
   SkipForward
 } from "lucide-react";
 import { NormalizedMedia } from "../types";
+import { useToast } from "./Toast";
 
 interface VideoPlayerPageProps {
   activeMedia: NormalizedMedia | null;
@@ -38,6 +39,7 @@ export function VideoPlayerPage({
   isAutoplayEnabled,
   onToggleAutoplay
 }: VideoPlayerPageProps) {
+  const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Video playback states
@@ -527,6 +529,7 @@ export function VideoPlayerPage({
                     download={`${activeMedia.title} - Audio.mp3`}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => toast.success("Download iniciado", `Preparando o áudio de '${activeMedia.title}' via proxy...`)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg transition-all shadow-md shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -555,6 +558,7 @@ export function VideoPlayerPage({
                     download={`${activeMedia.title} - Video.mp4`}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => toast.success("Download iniciado", `Iniciando a transferência do vídeo de '${activeMedia.title}'...`)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-lg transition-all shadow-md shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />

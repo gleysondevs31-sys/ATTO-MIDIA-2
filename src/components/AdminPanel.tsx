@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Users, Database, Star, Search, Shield, Settings, Trash2, Edit3, Key, Clock, Sparkles, RefreshCw, BarChart2, ListTodo, Check, X, AlertTriangle, ShieldCheck, Heart } from "lucide-react";
+import * as Lucide from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 
 interface UserAdminRow {
@@ -30,10 +31,12 @@ interface ActivityLogs {
 interface AdminPanelProps {
   token: string;
   currentUser: any;
+  customPlatforms?: any[];
+  onRefreshPlatforms: () => void;
 }
 
-export function AdminPanel({ token, currentUser }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs">("stats");
+export function AdminPanel({ token, currentUser, customPlatforms = [], onRefreshPlatforms }: AdminPanelProps) {
+  const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs" | "platforms">("stats");
   const [users, setUsers] = useState<UserAdminRow[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [logs, setLogs] = useState<ActivityLogs | null>(null);
@@ -51,6 +54,18 @@ export function AdminPanel({ token, currentUser }: AdminPanelProps) {
 
   // Search filter for user table
   const [userSearchQuery, setUserSearchQuery] = useState("");
+
+  // Dynamic Platform Config tab states
+  const [editingPlatform, setEditingPlatform] = useState<any | null>(null);
+  const [isAddingPlatform, setIsAddingPlatform] = useState(false);
+  const [platformKey, setPlatformKey] = useState("");
+  const [platformName, setPlatformName] = useState("");
+  const [platformIcon, setPlatformIcon] = useState("Music");
+  const [platformPrimaryUrl, setPlatformPrimaryUrl] = useState("");
+  const [platformFallbackUrl, setPlatformFallbackUrl] = useState("");
+  const [platformApiKeyOverride, setPlatformApiKeyOverride] = useState("");
+  const [platformIsEnabled, setPlatformIsEnabled] = useState(true);
+  const [isSavingPlatform, setIsSavingPlatform] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -201,6 +216,141 @@ export function AdminPanel({ token, currentUser }: AdminPanelProps) {
     }
   };
 
+  // Handle saving or updating dynamic platforms config
+  const handleSavePlatform = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!platformKey || !platformName || !platformPrimaryUrl) {
+      setError("Chave, Nome e Rota/URL Primária são obrigatórios.");
+      return;
+    }
+
+    setIsSavingPlatform(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const isEdit = !!editingPlatform;
+      const url = isEdit 
+        ? `/api/admin/platforms/${editingPlatform.id}`
+        : "/api/admin/platforms";
+      const method = isEdit ? "PUT" : "POST";
+
+      const body: any = {
+        name: platformName.trim(),
+        icon_name: platformIcon.trim(),
+        primary_api_url: platformPrimaryUrl.trim(),
+        fallback_api_url: platformFallbackUrl.trim() || null,
+        api_key_override: platformApiKeyOverride.trim() || null,
+        is_enabled: platformIsEnabled
+      };
+
+      if (!isEdit) {
+        body.platform_key = platformKey.trim().toLowerCase();
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.status) {
+        setSuccess(`Configuração da plataforma '${platformName}' salva com sucesso no Postgres!`);
+        setTimeout(() => setSuccess(null), 3000);
+        setIsAddingPlatform(false);
+        setEditingPlatform(null);
+        // Clean form
+        setPlatformKey("");
+        setPlatformName("");
+        setPlatformIcon("Music");
+        setPlatformPrimaryUrl("");
+        setPlatformFallbackUrl("");
+        setPlatformApiKeyOverride("");
+        setPlatformIsEnabled(true);
+        // Trigger parent refresh
+        onRefreshPlatforms();
+      } else {
+        throw new Error(data.error || "Erro ao salvar plataforma.");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSavingPlatform(false);
+    }
+  };
+
+  // Handle deleting dynamic platform config
+  const handleDeletePlatform = async (platformId: number, name: string) => {
+    if (!window.confirm(`Tem certeza que deseja remover permanentemente a plataforma '${name}' do sistema?`)) {
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/admin/platforms/${platformId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(`Plataforma '${name}' excluída com sucesso.`);
+        setTimeout(() => setSuccess(null), 3000);
+        onRefreshPlatforms();
+      } else {
+        throw new Error(data.error || "Falha ao excluir plataforma.");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Open Edit Platform Dialog
+  const handleOpenEditPlatform = (platform: any) => {
+    setEditingPlatform(platform);
+    setIsAddingPlatform(true);
+    setPlatformKey(platform.platform_key);
+    setPlatformName(platform.name);
+    setPlatformIcon(platform.icon_name || "Music");
+    setPlatformPrimaryUrl(platform.primary_api_url);
+    setPlatformFallbackUrl(platform.fallback_api_url || "");
+    setPlatformApiKeyOverride(platform.api_key_override || "");
+    setPlatformIsEnabled(platform.is_enabled);
+  };
+
+  // Quick platform enabled toggle status
+  const handleTogglePlatformStatus = async (platform: any) => {
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/admin/platforms/${platform.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ is_enabled: !platform.is_enabled })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess(`Status de '${platform.name}' alterado para ${!platform.is_enabled ? "ATIVADO" : "DESATIVADO"}.`);
+        setTimeout(() => setSuccess(null), 3000);
+        onRefreshPlatforms();
+      } else {
+        throw new Error(data.error || "Falha ao alterar status.");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   // Filters for user table search
   const filteredUsers = users.filter(u => {
     return (
@@ -304,6 +454,18 @@ export function AdminPanel({ token, currentUser }: AdminPanelProps) {
         >
           <Clock className="w-4 h-4" />
           <span>Logs de Auditoria</span>
+        </button>
+        <button
+          id="btn-admin-tab-platforms"
+          onClick={() => setActiveTab("platforms")}
+          className={`px-5 py-3.5 text-xs font-mono font-bold uppercase tracking-widest border-b-2 flex items-center gap-2 transition-all ${
+            activeTab === "platforms"
+              ? "border-primary text-rose-400 bg-primary/5"
+              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-[#111111]/30"
+          }`}
+        >
+          <Settings className="w-4 h-4 text-rose-500" />
+          <span>Redes &amp; Rotas</span>
         </button>
       </div>
 
@@ -590,6 +752,273 @@ export function AdminPanel({ token, currentUser }: AdminPanelProps) {
                 <p className="text-xs text-zinc-500 text-center py-12">Nenhum favorito adicionado.</p>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab content 4: PLATFORMS CONFIGURATION */}
+      {activeTab === "platforms" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="space-y-1">
+              <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                Gerenciador de Redes e Rotas Dinâmicas
+              </h4>
+              <p className="text-xs text-zinc-500">
+                Adicione novas integrações, defina as URLs de rotas primárias/fallback e ative/desative conexões com APIs do Postgres.
+              </p>
+            </div>
+            <button
+              id="btn-add-platform-trigger"
+              onClick={() => {
+                setEditingPlatform(null);
+                setPlatformKey("");
+                setPlatformName("");
+                setPlatformIcon("Music");
+                setPlatformPrimaryUrl("");
+                setPlatformFallbackUrl("");
+                setPlatformApiKeyOverride("");
+                setPlatformIsEnabled(true);
+                setIsAddingPlatform(true);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95 self-start sm:self-center shrink-0"
+            >
+              <Lucide.Plus className="w-4 h-4" />
+              <span>Nova Rede Social</span>
+            </button>
+          </div>
+
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-[#111111]/40">
+                    <th className="p-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Plataforma</th>
+                    <th className="p-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Chave</th>
+                    <th className="p-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Rota Primária</th>
+                    <th className="p-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Rota Fallback</th>
+                    <th className="p-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Status</th>
+                    <th className="p-4 text-[10px] font-mono font-bold text-zinc-500 text-right uppercase tracking-widest">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {customPlatforms.length > 0 ? (
+                    customPlatforms.map((platform: any) => {
+                      const IconComponent = (Lucide as any)[platform.icon_name] || Lucide.Music;
+                      return (
+                        <tr key={platform.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-zinc-900 border border-white/5 text-rose-500">
+                                <IconComponent className="w-4 h-4" />
+                              </div>
+                              <span className="text-xs font-bold text-white">{platform.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 font-mono text-xs text-zinc-400">
+                            {platform.platform_key}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-zinc-300 max-w-[200px] truncate" title={platform.primary_api_url}>
+                            {platform.primary_api_url}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-zinc-500 max-w-[200px] truncate" title={platform.fallback_api_url || "Nenhuma"}>
+                            {platform.fallback_api_url || <span className="italic text-zinc-600">Não configurada</span>}
+                          </td>
+                          <td className="p-4">
+                            <button
+                              onClick={() => handleTogglePlatformStatus(platform)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider transition-all ${
+                                platform.is_enabled
+                                  ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25"
+                                  : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:bg-zinc-750"
+                              }`}
+                            >
+                              {platform.is_enabled ? "Ativo" : "Inativo"}
+                            </button>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleOpenEditPlatform(platform)}
+                                className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-white/5 text-zinc-400 hover:text-white transition-all"
+                                title="Editar configurações"
+                              >
+                                <Lucide.Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePlatform(platform.id, platform.name)}
+                                className="p-2 rounded-lg bg-zinc-900 hover:bg-rose-950/30 border border-white/5 text-zinc-500 hover:text-rose-400 transition-all"
+                                title="Remover plataforma"
+                              >
+                                <Lucide.Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="p-12 text-center text-xs text-zinc-500">
+                        Nenhuma plataforma ou rede social configurada na base do Postgres.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adding / Editing Platform Modal */}
+      {isAddingPlatform && (
+        <div id="admin-platform-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl relative my-8">
+            <button
+              id="btn-admin-platform-modal-close"
+              onClick={() => {
+                setIsAddingPlatform(false);
+                setEditingPlatform(null);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mx-auto mb-3 animate-pulse">
+                <Settings className="w-5 h-5 text-rose-500" />
+              </div>
+              <h2 className="text-lg font-display font-extrabold text-white">
+                {editingPlatform ? "Editar Rede Social" : "Cadastrar Nova Rede Social"}
+              </h2>
+              <p className="text-xs text-zinc-500 mt-1">Defina as rotas da API e as credenciais integradas no Postgres</p>
+            </div>
+
+            <form onSubmit={handleSavePlatform} className="space-y-4 text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Platform Key (Disabled if editing) */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Chave de Busca (ID único)</label>
+                  <input
+                    id="platform-form-key"
+                    type="text"
+                    required
+                    disabled={!!editingPlatform}
+                    placeholder="ex: instagram"
+                    value={platformKey}
+                    onChange={(e) => setPlatformKey(e.target.value)}
+                    className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50 disabled:opacity-50"
+                  />
+                </div>
+
+                {/* Display Name */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Nome de Exibição</label>
+                  <input
+                    id="platform-form-name"
+                    type="text"
+                    required
+                    placeholder="ex: Instagram"
+                    value={platformName}
+                    onChange={(e) => setPlatformName(e.target.value)}
+                    className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Icon Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Ícone de Exibição</label>
+                  <select
+                    id="platform-form-icon"
+                    value={platformIcon}
+                    onChange={(e) => setPlatformIcon(e.target.value)}
+                    className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                  >
+                    <option value="Music">Música (Music)</option>
+                    <option value="Youtube">YouTube (Youtube)</option>
+                    <option value="Play">Player (Play)</option>
+                    <option value="Film">Filme (Film)</option>
+                    <option value="Compass">Bússola (Compass)</option>
+                    <option value="Heart">Coração (Heart)</option>
+                    <option value="Settings">Engrenagem (Settings)</option>
+                    <option value="Shield">Escudo (Shield)</option>
+                    <option value="User">Usuário (User)</option>
+                  </select>
+                </div>
+
+                {/* Status Switch */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block font-bold">Status Inicial</label>
+                  <div className="flex items-center h-[38px]">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={platformIsEnabled}
+                        onChange={(e) => setPlatformIsEnabled(e.target.checked)}
+                        className="rounded bg-[#111111] border-white/5 text-rose-500 focus:ring-0 cursor-pointer"
+                      />
+                      <span className="text-xs text-zinc-300">Habilitar Plataforma</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Primary API Url */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Rota / URL Primária</label>
+                <input
+                  id="platform-form-primary"
+                  type="text"
+                  required
+                  placeholder="ex: https://api.zero-two.com/soundcloud/search"
+                  value={platformPrimaryUrl}
+                  onChange={(e) => setPlatformPrimaryUrl(e.target.value)}
+                  className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                />
+                <span className="text-[9px] text-zinc-500 block">Endpoint principal acionado nas buscas e resoluções desta rede.</span>
+              </div>
+
+              {/* Fallback API Url */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Rota / URL de Fallback (Opcional)</label>
+                <input
+                  id="platform-form-fallback"
+                  type="text"
+                  placeholder="ex: https://api-fallback.com/soundcloud/search"
+                  value={platformFallbackUrl}
+                  onChange={(e) => setPlatformFallbackUrl(e.target.value)}
+                  className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                />
+                <span className="text-[9px] text-zinc-500 block">Acionado automaticamente em caso de instabilidade ou erro na rota primária.</span>
+              </div>
+
+              {/* Custom API Key Override */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Chave de API / Token Exclusivo (Opcional)</label>
+                <input
+                  id="platform-form-apikey"
+                  type="text"
+                  placeholder="Token de autorização ou chave de acesso personalizado"
+                  value={platformApiKeyOverride}
+                  onChange={(e) => setPlatformApiKeyOverride(e.target.value)}
+                  className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                />
+              </div>
+
+              {/* Save platform button */}
+              <button
+                id="btn-admin-platform-submit"
+                type="submit"
+                disabled={isSavingPlatform}
+                className="w-full bg-primary hover:bg-rose-500 text-white font-bold font-mono uppercase tracking-widest py-3 text-[10px] rounded-xl cursor-pointer shadow-lg active:scale-95 transition-all disabled:opacity-55 mt-4"
+              >
+                {isSavingPlatform ? "Salvando Configurações..." : "Confirmar e Salvar Configuração"}
+              </button>
+            </form>
           </div>
         </div>
       )}

@@ -11,7 +11,8 @@ import { VideoPlayerPage } from "./components/VideoPlayerPage";
 import { LoadingState } from "./components/LoadingState";
 import { ErrorState } from "./components/ErrorState";
 import { NormalizedMedia, SearchHistoryItem } from "./types";
-import { AlertCircle, HelpCircle, Film, Sparkles } from "lucide-react";
+import { AlertCircle, HelpCircle, Film, Sparkles, History, Trash2 } from "lucide-react";
+import { useToast } from "./components/Toast";
 
 // Auth and User Account components
 import { AuthModal } from "./components/AuthModal";
@@ -21,6 +22,7 @@ import { LandingPage } from "./components/LandingPage";
 import { AdminPanel } from "./components/AdminPanel";
 
 export default function App() {
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
@@ -35,6 +37,7 @@ export default function App() {
   const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [dbFavorites, setDbFavorites] = useState<NormalizedMedia[]>([]);
   const [dbHistory, setDbHistory] = useState<SearchHistoryItem[]>([]);
 
@@ -52,6 +55,25 @@ export default function App() {
       return true;
     }
   });
+
+  const [customPlatforms, setCustomPlatforms] = useState<any[]>([]);
+
+  const fetchPlatforms = () => {
+    fetch("/api/platforms")
+      .then(res => res.json())
+      .then(data => {
+        if (data.status && Array.isArray(data.platforms)) {
+          setCustomPlatforms(data.platforms);
+        }
+      })
+      .catch(err => {
+        console.error("Erro ao carregar plataformas:", err);
+      });
+  };
+
+  useEffect(() => {
+    fetchPlatforms();
+  }, []);
 
   const handleToggleAutoplay = () => {
     setIsAutoplayEnabled(prev => {
@@ -109,6 +131,8 @@ export default function App() {
     // Load databases
     fetchDbFavorites(authToken);
     fetchDbHistory(authToken);
+
+    toast.success("Login realizado", `Bem-vindo(a) de volta, ${userData.username}!`);
   };
 
   const handleLogout = () => {
@@ -118,9 +142,11 @@ export default function App() {
     setDbHistory([]);
     localStorage.removeItem("zerotwo_auth_token");
     setCurrentView("explore");
+
+    toast.info("Sessão encerrada", "Você saiu da sua conta com sucesso.");
   };
 
-  const handleUpdateProfile = async (updatedData: { username?: string; avatar?: string; bio?: string }) => {
+  const handleUpdateProfile = async (updatedData: { username?: string; avatar?: string; bio?: string; theme?: string }) => {
     if (!token) return false;
     try {
       const res = await fetch("/api/auth/profile", {
@@ -134,15 +160,23 @@ export default function App() {
       const data = await res.json();
       if (res.ok && data.status && data.user) {
         setUser(data.user);
+        toast.success("Perfil atualizado", "Suas informações de perfil e preferências foram salvas.");
         return true;
       } else {
         throw new Error(data.error || "Erro ao atualizar perfil");
       }
     } catch (err: any) {
       console.error("Profile update failed:", err.message);
+      toast.error("Erro ao atualizar perfil", err.message);
       throw err;
     }
   };
+
+  // Synchronize Accent Theme with User Preference
+  useEffect(() => {
+    const accentTheme = user && user.theme && user.theme !== "dark" ? user.theme : "rose";
+    document.documentElement.setAttribute("data-accent-theme", accentTheme);
+  }, [user]);
 
   const handleToggleFavorite = async (media: NormalizedMedia) => {
     if (!user || !token) {
@@ -164,6 +198,9 @@ export default function App() {
         });
         if (res.ok) {
           fetchDbFavorites(token);
+          toast.info("Removido dos favoritos", `'${media.title}' foi removido da sua lista.`);
+        } else {
+          toast.error("Erro ao remover", "Não foi possível remover dos favoritos.");
         }
       } else {
         const res = await fetch("/api/favorites", {
@@ -176,10 +213,14 @@ export default function App() {
         });
         if (res.ok) {
           fetchDbFavorites(token);
+          toast.success("Adicionado aos favoritos", `'${media.title}' foi salvo na sua coleção!`);
+        } else {
+          toast.error("Erro ao salvar", "Não foi possível adicionar aos favoritos.");
         }
       }
     } catch (err) {
       console.error("Error toggling favorites:", err);
+      toast.error("Erro de conexão", "Não foi possível completar a operação de favoritos.");
     }
   };
 
@@ -196,9 +237,13 @@ export default function App() {
       });
       if (res.ok) {
         fetchDbFavorites(token);
+        toast.info("Removido dos favoritos", "O item foi removido com sucesso.");
+      } else {
+        toast.error("Erro ao remover", "Não foi possível remover dos favoritos.");
       }
     } catch (err) {
       console.error("Error removing favorite:", err);
+      toast.error("Erro de conexão", "Falha de rede ao tentar remover dos favoritos.");
     }
   };
 
@@ -248,6 +293,9 @@ export default function App() {
       })
       .catch(err => {
         console.log("Auto-login failed:", err.message);
+        if (savedToken) {
+          toast.warning("Sessão Expirada", "Sua sessão anterior expirou. Por favor, conecte-se novamente.");
+        }
         localStorage.removeItem("zerotwo_auth_token");
         setToken(null);
       });
@@ -434,22 +482,31 @@ export default function App() {
       ) : (
         <>
           {/* Sleek Translucent Header */}
-          <Header />
+          <Header 
+            user={user} 
+            onOpenAuth={() => setIsAuthModalOpen(true)} 
+            onLogout={handleLogout}
+            onSelectView={setCurrentView}
+            currentView={currentView}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+          />
 
           {/* Main Responsive Body Area */}
-          <div className="flex-1 flex flex-col lg:flex-row">
+          <div className="flex-1 flex flex-col lg:flex-row relative">
             {/* Navigation Sidebar */}
             <Sidebar
-              history={user ? dbHistory : history}
-              onClearHistory={user ? handleClearDbHistory : handleClearHistory}
-              onSelectHistory={handleSelectHistory}
-              selectedPlatform={selectedPlatform}
-              onSelectPlatform={handleSelectPlatform}
               currentView={currentView}
               onSelectView={setCurrentView}
               hasActiveVideo={activeMedia?.type === "video"}
               user={user}
-              onOpenAuth={() => setIsAuthModalOpen(true)}
+              selectedPlatform={selectedPlatform}
+              onSelectPlatform={handleSelectPlatform}
+              history={user ? dbHistory : history}
+              onClearHistory={user ? handleClearDbHistory : handleClearHistory}
+              onSelectHistory={handleSelectHistory}
+              isOpen={isSidebarOpen}
+              onClose={() => setIsSidebarOpen(false)}
             />
 
             {/* Core Main Viewport */}
@@ -458,7 +515,7 @@ export default function App() {
               {currentView === "explore" ? (
             <>
               {/* Welcome Dashboard Banner */}
-              <div className="relative overflow-hidden rounded-2xl bg-[#111111] border border-white/5 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
+              <div className="relative overflow-hidden rounded-2xl bg-[#111111]/80 border border-white/5 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
                 <div className="space-y-2 text-center md:text-left z-10">
                   <span className="flex items-center justify-center md:justify-start gap-1.5 text-xs font-mono font-bold text-primary uppercase tracking-widest">
                     <Sparkles className="w-3.5 h-3.5" /> Explorador de Mídia Inteligente
@@ -471,36 +528,31 @@ export default function App() {
                   </p>
                 </div>
                 
-                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center text-primary animate-pulse shrink-0">
-                  <Film className="w-8 h-8" />
+                <div className="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary animate-pulse shrink-0">
+                  <Film className="w-6 h-6" />
                 </div>
               </div>
 
               {/* Interactive Search Section */}
-              <div className="space-y-6">
+              <div className="bg-[#111111]/30 border border-white/5 p-6 rounded-2xl">
                 <SearchBar 
                   onSearch={(q, isUrl) => performSearch(q, selectedPlatform, isUrl)} 
                   isLoading={isLoading}
                   initialQuery={query}
+                  selectedPlatform={selectedPlatform}
                 />
-                
-                {/* Horizontal filters for mobile screens */}
-                <div className="block lg:hidden">
-                  <PlatformFilter 
-                    selectedPlatform={selectedPlatform}
-                    onSelectPlatform={handleSelectPlatform}
-                  />
-                </div>
               </div>
 
+
+
               {/* Results Feed Section */}
-              <section className="space-y-4">
+              <section className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-gray-400">
+                  <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-zinc-400">
                     {query ? `Resultados para "${query}"` : "Explorar Mídias Populares"}
                   </h3>
                   
-                  <span className="text-xs font-mono text-gray-500">
+                  <span className="text-xs font-mono text-zinc-500">
                     {results.length} item(ns) encontrado(s)
                   </span>
                 </div>
@@ -543,6 +595,8 @@ export default function App() {
             <AdminPanel
               token={token}
               currentUser={user}
+              customPlatforms={customPlatforms}
+              onRefreshPlatforms={fetchPlatforms}
             />
           ) : (
             /* Dedicated Cinematic Video Player Page */

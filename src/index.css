@@ -39,3 +39,40 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary);
 }
+
+/* Accent Color Themes */
+:root {
+  --color-primary: #f43f5e;
+  --color-primary-hover: #e11d48;
+  --color-accent: #9f1239;
+}
+
+:root[data-accent-theme="rose"] {
+  --color-primary: #f43f5e;
+  --color-primary-hover: #e11d48;
+  --color-accent: #9f1239;
+}
+
+:root[data-accent-theme="violet"] {
+  --color-primary: #8b5cf6;
+  --color-primary-hover: #7c3aed;
+  --color-accent: #5b21b6;
+}
+
+:root[data-accent-theme="emerald"] {
+  --color-primary: #10b981;
+  --color-primary-hover: #059669;
+  --color-accent: #065f46;
+}
+
+:root[data-accent-theme="amber"] {
+  --color-primary: #f59e0b;
+  --color-primary-hover: #d97706;
+  --color-accent: #92400e;
+}
+
+:root[data-accent-theme="sky"] {
+  --color-primary: #0ea5e9;
+  --color-primary-hover: #0284c7;
+  --color-accent: #075985;
+}

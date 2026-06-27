@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, X, Maximize2, ExternalLink, Music, Video, Loader2, SkipForward } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, X, Maximize2, ExternalLink, Music, Video, Loader2, SkipForward, Share2 } from "lucide-react";
 import { NormalizedMedia } from "../types";
+import { useToast } from "./Toast";
 
 interface MediaPlayerProps {
   media: NormalizedMedia | null;
@@ -11,8 +12,21 @@ interface MediaPlayerProps {
 }
 
 export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutoplay, onPlayNext }: MediaPlayerProps) {
+  const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const handleShare = () => {
+    if (!media || !media.originalUrl) return;
+    navigator.clipboard.writeText(media.originalUrl)
+      .then(() => {
+        toast.success("Link copiado!", "O link original da mídia foi copiado para a área de transferência.");
+      })
+      .catch((err) => {
+        console.error("Falha ao copiar link:", err);
+        toast.error("Erro ao compartilhar", "Não foi possível copiar o link.");
+      });
+  };
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -340,6 +354,16 @@ export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutopla
           </div>
 
           <div className="h-4 w-px bg-white/5 hidden md:block" />
+
+          {/* Share Button */}
+          <button
+            id="btn-player-share"
+            onClick={handleShare}
+            className="text-gray-400 hover:text-white transition-colors p-1 bg-[#111111] hover:bg-[#1a1a1a] rounded-md border border-white/5 cursor-pointer"
+            title="Compartilhar Mídia"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
 
           {/* Close Player */}
           <button

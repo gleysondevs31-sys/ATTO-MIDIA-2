@@ -13,7 +13,7 @@ interface ProfileViewProps {
     theme: string;
     created_at?: string;
   };
-  onUpdateProfile: (updatedData: { username?: string; avatar?: string; bio?: string }) => Promise<boolean>;
+  onUpdateProfile: (updatedData: { username?: string; avatar?: string; bio?: string; theme?: string }) => Promise<boolean>;
   onLogout: () => void;
   favoritesCount: number;
   historyCount: number;
@@ -29,6 +29,7 @@ export function ProfileView({
   const [username, setUsername] = useState(user.username);
   const [bio, setBio] = useState(user.bio || "");
   const [selectedAvatar, setSelectedAvatar] = useState(user.avatar);
+  const [selectedTheme, setSelectedTheme] = useState(user.theme === "dark" || !user.theme ? "rose" : user.theme);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -42,6 +43,20 @@ export function ProfileView({
     { name: "Aventureiro Espacial", url: "https://api.dicebear.com/7.x/adventurer/svg?seed=star" },
     { name: "Gamer Cyberpunk", url: "https://api.dicebear.com/7.x/bottts-neutral/svg?seed=game" },
   ];
+
+  // Accent theme options
+  const themePresets = [
+    { key: "rose", name: "Rose", color: "bg-[#f43f5e]", border: "border-[#f43f5e]" },
+    { key: "violet", name: "Violet", color: "bg-[#8b5cf6]", border: "border-[#8b5cf6]" },
+    { key: "emerald", name: "Emerald", color: "bg-[#10b981]", border: "border-[#10b981]" },
+    { key: "amber", name: "Amber", color: "bg-[#f59e0b]", border: "border-[#f59e0b]" },
+    { key: "sky", name: "Sky", color: "bg-[#0ea5e9]", border: "border-[#0ea5e9]" },
+  ];
+
+  // Immediately apply the theme on preview change
+  React.useEffect(() => {
+    document.documentElement.setAttribute("data-accent-theme", selectedTheme);
+  }, [selectedTheme]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,10 +75,11 @@ export function ProfileView({
         username: username.trim(),
         bio: bio.trim(),
         avatar: selectedAvatar,
+        theme: selectedTheme,
       });
 
       if (ok) {
-        setSuccess("Perfil atualizado e salvo com sucesso no PostgreSQL!");
+        setSuccess("Perfil e tema atualizados e salvos com sucesso no PostgreSQL!");
         setTimeout(() => setSuccess(null), 4000);
       } else {
         throw new Error("Falha na atualização de perfil no banco.");
@@ -227,6 +243,32 @@ export function ProfileView({
                     }`}
                   >
                     <img src={preset.url} alt={preset.name} className="w-10 h-10 object-contain" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Select Accent Color Theme */}
+            <div className="space-y-3">
+              <label className="text-[11px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
+                Tema de Cor de Destaque (Accent Theme)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {themePresets.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => setSelectedTheme(preset.key)}
+                    className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                      selectedTheme === preset.key
+                        ? "border-primary bg-primary/10 shadow-md scale-105"
+                        : "border-white/5 bg-[#111111]/30 hover:border-white/10 hover:bg-[#111111]"
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full ${preset.color} border border-white/20 shadow-sm`} />
+                    <span className="text-[11px] font-medium text-gray-300 font-mono">
+                      {preset.name}
+                    </span>
                   </button>
                 ))}
               </div>

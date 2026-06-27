@@ -171,6 +171,88 @@ function rateLimiter(req: express.Request, res: express.Response, next: express.
 // Apply rate limiter to all api routes
 app.use("/api/", rateLimiter);
 
+// Get platform configuration from PostgreSQL
+async function getPlatformConfig(platformKey: string) {
+  try {
+    const res = await pool.query("SELECT * FROM platforms_config WHERE platform_key = $1", [platformKey.toLowerCase().trim()]);
+    if (res.rows.length > 0) {
+      return res.rows[0];
+    }
+  } catch (err: any) {
+    console.warn(`[Config Check] Failed to read db configuration for platform '${platformKey}':`, err.message);
+  }
+  return null;
+}
+
+// Fetch from a specific platform using its configured primary/fallback URLs and credentials
+async function fetchFromPlatform(platformKey: string, defaultEndpoint: string, params: Record<string, string>) {
+  const config = await getPlatformConfig(platformKey);
+  const isEnabled = config ? config.is_enabled : true;
+  
+  if (!isEnabled) {
+    throw new Error(`A plataforma '${platformKey}' está desativada nas configurações do sistema.`);
+  }
+
+  // Determine primary and fallback URLs, and API key
+  let primaryBase = config?.primary_api_url || API_BASE_URL;
+  let fallbackBase = config?.fallback_api_url || null;
+  const customKey = config?.api_key_override || API_KEY;
+
+  const runFetch = async (baseUrl: string) => {
+    let url: string;
+    const queryParams = new URLSearchParams({ ...params, apikey: customKey }).toString();
+
+    // Clean slash combination to prevent double slashes
+    if (baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
+      const separator = baseUrl.includes("?") ? "&" : "?";
+      if (baseUrl.includes("/api/") || baseUrl.includes("/download")) {
+        url = `${baseUrl}${separator}${queryParams}`;
+      } else {
+        const pathPart = defaultEndpoint.startsWith("/") ? defaultEndpoint : `/${defaultEndpoint}`;
+        const baseClean = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+        url = `${baseClean}${pathPart}?${queryParams}`;
+      }
+    } else {
+      // Relative or local route, e.g. /api/media/yt-download
+      const baseClean = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+      const pathPart = baseUrl.startsWith("/") ? baseUrl : `/${baseUrl}`;
+      url = `${baseClean}${pathPart}?${queryParams}`;
+    }
+
+    const loggedUrl = url.replace(customKey, "HIDDEN_KEY");
+    console.log(`[Dynamic Route] Fetching '${platformKey}' from: ${loggedUrl}`);
+
+    const response = await fetch(url);
+    if (response.status === 429) {
+      const err: any = new Error(`Limite de taxa excedido na API upstream para ${platformKey}.`);
+      err.statusCode = 429;
+      throw err;
+    }
+
+    if (!response.ok) {
+      throw new Error(`A API da plataforma respondeu com status ${response.status}`);
+    }
+
+    return await response.json();
+  };
+
+  try {
+    return await runFetch(primaryBase);
+  } catch (primaryErr: any) {
+    console.warn(`[Dynamic Route] Primary route failed for '${platformKey}':`, primaryErr.message);
+    if (fallbackBase) {
+      console.log(`[Dynamic Route] Falling back for '${platformKey}' to: ${fallbackBase}`);
+      try {
+        return await runFetch(fallbackBase);
+      } catch (fallbackErr: any) {
+        console.error(`[Dynamic Route] Fallback route also failed for '${platformKey}':`, fallbackErr.message);
+        throw fallbackErr;
+      }
+    }
+    throw primaryErr;
+  }
+}
+
 // Helper function to fetch from Zero Two API with key & handle rate limit/errors robustly
 async function fetchFromZeroTwo(endpoint: string, params: Record<string, string>) {
   const queryParams = new URLSearchParams({ ...params, apikey: API_KEY }).toString();
@@ -500,7 +582,7 @@ app.get("/api/search", async (req, res) => {
     // 2. Soundcloud Search
     if (platform === "soundcloud" || platform === "all") {
       try {
-        const scData = await fetchFromZeroTwo("/api/soundcloud/search", { query });
+        const scData = await fetchFromPlatform("soundcloud", "/api/soundcloud/search", { query });
         if (scData && scData.status && Array.isArray(scData.resultado)) {
           results.push(
             ...scData.resultado.map((item: any) => ({
@@ -527,7 +609,7 @@ app.get("/api/search", async (req, res) => {
     // 3. Spotify Search
     if (platform === "spotify" || platform === "all") {
       try {
-        const spotData = await fetchFromZeroTwo("/api/spotify/search", { q: query, type: "track", limit: "15" });
+        const spotData = await fetchFromPlatform("spotify", "/api/spotify/search", { q: query, type: "track", limit: "15" });
         if (spotData && spotData.status && Array.isArray(spotData.resultado)) {
           results.push(
             ...spotData.resultado.map((item: any) => ({
@@ -608,7 +690,7 @@ app.get("/api/search", async (req, res) => {
           ].filter((v, idx, self) => self.indexOf(v) === idx && v.length > 0);
           
           const promises = variations.map(v => 
-            fetchFromZeroTwo("/download/tiktoksearch", { username: v }).catch(() => null)
+            fetchFromPlatform("tiktok", "/download/tiktoksearch", { username: v }).catch(() => null)
           );
           
           const responses = await Promise.all(promises);
@@ -673,7 +755,7 @@ app.get("/api/media/details", async (req, res) => {
 
     if (platform === "soundcloud") {
       try {
-        const scData = await fetchFromZeroTwo("/api/soundcloud/search", { query: id });
+        const scData = await fetchFromPlatform("soundcloud", "/api/soundcloud/search", { query: id });
         if (scData && scData.status && Array.isArray(scData.resultado)) {
           const found = scData.resultado.find((item: any) => String(item.id) === String(id) || `sc-${item.id}` === id) || scData.resultado[0];
           if (found) {
@@ -697,7 +779,7 @@ app.get("/api/media/details", async (req, res) => {
       }
     } else if (platform === "spotify") {
       try {
-        const spotData = await fetchFromZeroTwo("/api/spotify/search", { q: id, type: "track", limit: "1" });
+        const spotData = await fetchFromPlatform("spotify", "/api/spotify/search", { q: id, type: "track", limit: "1" });
         if (spotData && spotData.status && Array.isArray(spotData.resultado) && spotData.resultado.length > 0) {
           const item = spotData.resultado[0];
           details = {
@@ -719,7 +801,7 @@ app.get("/api/media/details", async (req, res) => {
       }
     } else if (platform === "tiktok") {
       try {
-        const ttData = await fetchFromZeroTwo("/download/tiktoksearch", { username: id });
+        const ttData = await fetchFromPlatform("tiktok", "/download/tiktoksearch", { username: id });
         if (ttData && ttData.status && ttData.resultado) {
           const item = ttData.resultado;
           details = {
@@ -745,7 +827,10 @@ app.get("/api/media/details", async (req, res) => {
     // Try fallback multi-dl resolution if the ID looks like a full URI
     if (!details && (id.startsWith("http://") || id.startsWith("https://"))) {
       try {
-        const rawData = await fetchFromZeroTwo("/api/dl/multidl", { url: id });
+        // Fallback or dynamic configuration for general multi-dl downloader
+        const rawData = await fetchFromPlatform(platform || "generic", "/api/dl/multidl", { url: id }).catch(() => 
+          fetchFromZeroTwo("/api/dl/multidl", { url: id })
+        );
         if (rawData && rawData.resultado) {
           const resObj = rawData.resultado;
           const isYt = id.includes("youtube.com") || id.includes("youtu.be") || (resObj.source && resObj.source.toLowerCase().includes("youtube"));
@@ -1845,6 +1930,110 @@ app.get("/api/admin/logs", authenticateToken, requireAdmin, async (req, res) => 
   } catch (err: any) {
     console.error("[Admin Activity Feed Error]:", err.message);
     return res.status(500).json({ error: "Erro ao obter feed de atividade do sistema" });
+  }
+});
+
+// ==========================================
+// DYNAMIC PLATFORMS & ROUTING CONFIGURATION
+// ==========================================
+
+// Get all available platforms (public endpoint used by sidebar/search filter)
+app.get("/api/platforms", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM platforms_config ORDER BY id ASC");
+    return res.json({ status: true, platforms: result.rows });
+  } catch (err: any) {
+    console.error("[Get Platforms Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao carregar plataformas do sistema" });
+  }
+});
+
+// Create a new platform config (Admin only)
+app.post("/api/admin/platforms", authenticateToken, requireAdmin, async (req, res) => {
+  const { platform_key, name, icon_name, primary_api_url, fallback_api_url, api_key_override, is_enabled } = req.body;
+
+  if (!platform_key || !name || !primary_api_url) {
+    return res.status(400).json({ error: "Chave, nome e rota primária são obrigatórios." });
+  }
+
+  try {
+    const insertRes = await pool.query(
+      `INSERT INTO platforms_config (platform_key, name, icon_name, primary_api_url, fallback_api_url, api_key_override, is_enabled)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        platform_key.trim().toLowerCase(),
+        name.trim(),
+        icon_name ? icon_name.trim() : "Music",
+        primary_api_url.trim(),
+        fallback_api_url ? fallback_api_url.trim() : null,
+        api_key_override ? api_key_override.trim() : null,
+        is_enabled !== false
+      ]
+    );
+    return res.json({ status: true, platform: insertRes.rows[0] });
+  } catch (err: any) {
+    console.error("[Admin Create Platform Error]:", err.message);
+    if (err.code === "23505") {
+      return res.status(400).json({ error: "Já existe uma plataforma com essa chave de identificação." });
+    }
+    return res.status(500).json({ error: "Erro interno ao cadastrar plataforma." });
+  }
+});
+
+// Update a platform config (Admin only)
+app.put("/api/admin/platforms/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, icon_name, primary_api_url, fallback_api_url, api_key_override, is_enabled } = req.body;
+
+  try {
+    const updateRes = await pool.query(
+      `UPDATE platforms_config 
+       SET name = COALESCE($1, name),
+           icon_name = COALESCE($2, icon_name),
+           primary_api_url = COALESCE($3, primary_api_url),
+           fallback_api_url = $4,
+           api_key_override = $5,
+           is_enabled = COALESCE($6, is_enabled)
+       WHERE id = $7
+       RETURNING *`,
+      [
+        name ? name.trim() : null,
+        icon_name ? icon_name.trim() : null,
+        primary_api_url ? primary_api_url.trim() : null,
+        fallback_api_url ? fallback_api_url.trim() : null,
+        api_key_override ? api_key_override.trim() : null,
+        is_enabled === undefined ? null : is_enabled,
+        id
+      ]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "Configuração de plataforma não encontrada." });
+    }
+
+    return res.json({ status: true, platform: updateRes.rows[0] });
+  } catch (err: any) {
+    console.error("[Admin Update Platform Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao atualizar plataforma." });
+  }
+});
+
+// Delete a platform config (Admin only)
+app.delete("/api/admin/platforms/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deleteRes = await pool.query("DELETE FROM platforms_config WHERE id = $1 RETURNING id, name", [id]);
+
+    if (deleteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Configuração de plataforma não encontrada para exclusão." });
+    }
+
+    return res.json({ status: true, message: `Plataforma '${deleteRes.rows[0].name}' removida com sucesso.` });
+  } catch (err: any) {
+    console.error("[Admin Delete Platform Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao excluir plataforma." });
   }
 });
 
