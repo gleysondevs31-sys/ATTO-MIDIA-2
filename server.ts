@@ -2,12 +2,123 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
+import fs from "fs";
+import crypto from "crypto";
+import tiktok from "@tobyg74/tiktok-api-dl";
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Set up local media cache directory
+const CACHE_DIR = path.join(process.cwd(), "atto_cache");
+if (!fs.existsSync(CACHE_DIR)) {
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+// Map to coalese active downloads and prevent overlapping requests for the same media url
+const activeDownloads = new Map<string, Promise<{ filePath: string; contentType: string }>>();
+
+async function getOrDownloadMedia(mediaUrl: string, isYtProxy = false): Promise<{ filePath: string; contentType: string }> {
+  const hash = crypto.createHash("sha256").update(mediaUrl).digest("hex");
+  const filePath = path.join(CACHE_DIR, hash);
+  const metaPath = path.join(CACHE_DIR, `${hash}.json`);
+
+  // Verify if cache files already exist and have valid size
+  if (fs.existsSync(filePath) && fs.existsSync(metaPath)) {
+    try {
+      const stats = fs.statSync(filePath);
+      // We require at least 25KB to be a valid file stream (avoiding empty errors or miniature error HTMLs)
+      if (stats.size > 25000) {
+        const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+        console.log(`[Atto Cache Hit] Serving ${hash} from disk cache. Size: ${stats.size} bytes`);
+        return { filePath, contentType: meta.contentType || "application/octet-stream" };
+      } else {
+        // Unlink potentially corrupt or error files
+        try { fs.unlinkSync(filePath); } catch {}
+        try { fs.unlinkSync(metaPath); } catch {}
+      }
+    } catch (e) {
+      console.error("[Atto Cache read/validate error]", e);
+    }
+  }
+
+  // If there's an active download for this hash, wait for it
+  if (activeDownloads.has(hash)) {
+    console.log(`[Atto Cache Coalesce] Waiting for active download: ${hash}`);
+    return activeDownloads.get(hash)!;
+  }
+
+  const downloadPromise = (async () => {
+    console.log(`[Atto Cache Miss] Downloading and caching: ${mediaUrl} to ${hash}`);
+    
+    const headers: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "*/*",
+      "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7",
+    };
+
+    if (mediaUrl.includes("tiktok.com")) {
+      headers["Referer"] = "https://www.tiktok.com/";
+    } else if (mediaUrl.includes("instagram.com")) {
+      headers["Referer"] = "https://www.instagram.com/";
+    }
+
+    const response = await fetch(mediaUrl, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch media from source. HTTP status: ${response.status}`);
+    }
+
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    const fileStream = fs.createWriteStream(filePath);
+    
+    if (response.body) {
+      if (typeof (response.body as any).getReader === "function") {
+        const reader = (response.body as any).getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fileStream.write(value);
+        }
+      } else {
+        for await (const chunk of response.body as any) {
+          fileStream.write(chunk);
+        }
+      }
+    }
+    
+    await new Promise<void>((resolve, reject) => {
+      fileStream.end((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    const stats = fs.statSync(filePath);
+    // Sanity check
+    if (stats.size < 20000 && !isYtProxy) {
+      try { fs.unlinkSync(filePath); } catch {}
+      throw new Error(`Downloaded file is too small (${stats.size} bytes), likely a blocked error page.`);
+    }
+
+    // Save metadata
+    fs.writeFileSync(metaPath, JSON.stringify({ contentType, url: mediaUrl, timestamp: Date.now() }), "utf-8");
+    console.log(`[Atto Cache Done] Caching completed: ${hash}. Size: ${stats.size} bytes`);
+
+    return { filePath, contentType };
+  })();
+
+  activeDownloads.set(hash, downloadPromise);
+
+  try {
+    const result = await downloadPromise;
+    return result;
+  } finally {
+    activeDownloads.delete(hash);
+  }
+}
 
 // Zero Two Configs - Protect API Key strictly using either API_KEY or ZERO_TWO_API_KEY environment variables
 const API_KEY = process.env.API_KEY || process.env.ZERO_TWO_API_KEY || "onnx-ia-key";
@@ -154,6 +265,148 @@ async function searchYouTube(query: string): Promise<any[]> {
   }
 }
 
+// Helper function to query DuckDuckGo for TikTok URLs based on a query
+async function searchTikTokUrls(query: string): Promise<string[]> {
+  const url = `https://html.duckduckgo.com/html/?q=site:tiktok.com+${encodeURIComponent(query)}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5"
+      }
+    });
+    if (!res.ok) {
+      throw new Error(`DuckDuckGo responded with status ${res.status}`);
+    }
+    const html = await res.text();
+    
+    const regex = /uddg=([^"&'\s]+)/g;
+    let match;
+    const urls: string[] = [];
+    while ((match = regex.exec(html)) !== null) {
+      try {
+        const decoded = decodeURIComponent(match[1]);
+        // Filter out tag pages, discover pages, and keep actual video posts
+        if (decoded.includes("tiktok.com/") && !decoded.includes("/tag/") && !decoded.includes("/discover/")) {
+          urls.push(decoded);
+        }
+      } catch {}
+    }
+    
+    return Array.from(new Set(urls)).slice(0, 10);
+  } catch (e: any) {
+    console.error("[searchTikTokUrls error]:", e.message);
+    return [];
+  }
+}
+
+// Fetch details for a specific TikTok URL with failover across multiple endpoints
+async function fetchTikTokDetails(url: string): Promise<any | null> {
+  // 1. Try TobyG74 tiktok-api-dl (v3 MusicalDown) first
+  try {
+    const dlRes = await tiktok.Downloader(url, { version: "v3" });
+    if (dlRes && dlRes.status === "success" && dlRes.result) {
+      const item = dlRes.result;
+      return {
+        title: item.desc || "TikTok Video",
+        author: (item.author as any)?.nickname || (item.author as any)?.uniqueId || "TikTok User",
+        thumbnail: item.author?.avatar || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+        playableVideoUrl: item.videoHD || item.videoSD || item.videoWatermark || null,
+        playableAudioUrl: item.music || null,
+        originalUrl: url,
+        raw: item
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[TikTok Detail Fetch] TobyG74 v3 failed for ${url}:`, err.message);
+  }
+
+  // 2. Try TobyG74 tiktok-api-dl (v2 SSSTik)
+  try {
+    const dlRes = await tiktok.Downloader(url, { version: "v2" });
+    if (dlRes && dlRes.status === "success" && dlRes.result) {
+      const item = dlRes.result;
+      return {
+        title: item.desc || "TikTok Video",
+        author: (item.author as any)?.nickname || (item.author as any)?.uniqueId || "TikTok User",
+        thumbnail: item.author?.avatar || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+        playableVideoUrl: item.video?.playAddr?.[0] || null,
+        playableAudioUrl: item.music?.playUrl?.[0] || null,
+        originalUrl: url,
+        raw: item
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[TikTok Detail Fetch] TobyG74 v2 failed for ${url}:`, err.message);
+  }
+
+  // Fallbacks: ZeroTwo API endpoints if TobyG74 fails
+  // 3. Try v3
+  try {
+    const data = await fetchFromZeroTwo("/api/download/tiktok/v3", { url });
+    if (data && data.status && data.resultado) {
+      const item = data.resultado;
+      return {
+        title: item.desc || "TikTok Video",
+        author: item.author?.nickname || item.author?.name || "TikTok User",
+        thumbnail: item.author?.avatar || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+        playableVideoUrl: item.videoHD || item.videoSD || item.videoWatermark || null,
+        playableAudioUrl: item.music || null,
+        originalUrl: url,
+        raw: item
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[TikTok Detail Fetch] v3 failed for ${url}:`, err.message);
+  }
+
+  // 4. Fallback to multidl - standard robust fallback
+  try {
+    const data = await fetchFromZeroTwo("/api/dl/multidl", { url });
+    if (data && data.resultado) {
+      const item = data.resultado;
+      const medias = item.medias || [];
+      const videoUrl = medias.find((m: any) => m.type === "video" && m.quality === "no_watermark")?.url || 
+                       medias.find((m: any) => m.type === "video")?.url;
+      const audioUrl = medias.find((m: any) => m.type === "audio")?.url;
+
+      return {
+        title: item.title || "TikTok Video",
+        author: item.author || item.unique_id || "TikTok User",
+        thumbnail: item.thumbnail || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+        playableVideoUrl: videoUrl || null,
+        playableAudioUrl: audioUrl || null,
+        originalUrl: url,
+        raw: item
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[TikTok Detail Fetch] multidl failed for ${url}:`, err.message);
+  }
+
+  // 5. Fallback to v4
+  try {
+    const data = await fetchFromZeroTwo("/api/download/tiktok/v4", { url });
+    if (data && data.status && data.resultado) {
+      const item = data.resultado;
+      return {
+        title: item.detalhes?.desc || "TikTok Video",
+        author: item.detalhes?.author?.nickname || "TikTok User",
+        thumbnail: item.detalhes?.author?.avatar || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+        playableVideoUrl: item.video?.playAddr?.[0] || null,
+        playableAudioUrl: item.audio?.playUrl?.[0] || null,
+        originalUrl: url,
+        raw: item
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[TikTok Detail Fetch] v4 failed for ${url}:`, err.message);
+  }
+
+  return null;
+}
+
 // ==========================================
 // API ROUTE 1: GET /api/search?q=&platform=
 // ==========================================
@@ -251,45 +504,84 @@ app.get("/api/search", async (req, res) => {
       }
     }
 
-    // 4. TikTok Search (Enhanced: fetches multiple query variations to return up to 4 items)
+    // 4. TikTok Search (Enhanced: fetches multiple real search results using DDG scraper and falls back to username search)
     if (platform === "tiktok" || platform === "all") {
       try {
-        const variations = [
-          query,
-          `${query} music`,
-          `${query} trend`,
-          `${query} video`
-        ];
-        
-        const promises = variations.map(v => 
-          fetchFromZeroTwo("/download/tiktoksearch", { username: v })
-            .catch(() => null)
-        );
-        
-        const responses = await Promise.all(promises);
         const seenVideos = new Set<string>();
+        const tURLs = await searchTikTokUrls(query);
+        console.log(`[TikTok Search] Found ${tURLs.length} URLs from DDG for query: ${query}`);
         
-        for (const ttData of responses) {
-          if (ttData && ttData.status && ttData.resultado) {
-            const item = ttData.resultado;
-            const videoId = item.title || item.no_watermark || item.cover;
-            if (seenVideos.has(videoId)) continue;
-            seenVideos.add(videoId);
-            
-            results.push({
-              id: `tt-${item.author || Math.random().toString()}-${item.cover?.split("/").pop() || Math.random().toString()}`,
-              platform: "tiktok",
-              title: item.title || "TikTok Video",
-              author: item.author || "TikTok User",
-              thumbnail: item.cover || item.origin_cover || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
-              duration: "",
-              description: item.title || "TikTok Post",
-              originalUrl: item.author ? `https://www.tiktok.com/@${item.author.replace("@", "")}` : "https://www.tiktok.com",
-              playableAudioUrl: item.music || null,
-              playableVideoUrl: item.no_watermark || item.watermark || null,
-              type: "video" as const,
-              raw: item
-            });
+        if (tURLs.length > 0) {
+          // Fetch details for up to 8 unique URLs in parallel
+          const detailPromises = tURLs.slice(0, 8).map(url => fetchTikTokDetails(url));
+          const details = await Promise.all(detailPromises);
+          
+          for (let i = 0; i < details.length; i++) {
+            const item = details[i];
+            if (item) {
+              const videoId = item.playableVideoUrl || item.originalUrl;
+              if (seenVideos.has(videoId)) continue;
+              seenVideos.add(videoId);
+              
+              results.push({
+                id: `tt-${Buffer.from(item.originalUrl).toString("base64").substring(0, 15)}`,
+                platform: "tiktok",
+                title: item.title,
+                author: item.author,
+                thumbnail: item.thumbnail,
+                duration: "",
+                description: item.title,
+                originalUrl: item.originalUrl,
+                playableAudioUrl: item.playableAudioUrl,
+                playableVideoUrl: item.playableVideoUrl,
+                type: "video" as const,
+                raw: item.raw
+              });
+            }
+          }
+        }
+
+        // Fallback to username variations if DDG search yielded 0 results
+        if (results.filter(r => r.platform === "tiktok").length === 0) {
+          console.log("[TikTok Search] DuckDuckGo search yielded 0 results. Running username search fallback...");
+          const cleanQuery = query.toLowerCase().trim().replace(/\s+/g, "_");
+          const spacelessQuery = query.toLowerCase().trim().replace(/\s+/g, "");
+          
+          const variations = [
+            cleanQuery,
+            spacelessQuery,
+            `${cleanQuery}_music`,
+            `${cleanQuery}_oficial`,
+            `${cleanQuery}_funk`
+          ].filter((v, idx, self) => self.indexOf(v) === idx && v.length > 0);
+          
+          const promises = variations.map(v => 
+            fetchFromZeroTwo("/download/tiktoksearch", { username: v }).catch(() => null)
+          );
+          
+          const responses = await Promise.all(promises);
+          for (const ttData of responses) {
+            if (ttData && ttData.status && ttData.resultado) {
+              const item = ttData.resultado;
+              const videoId = item.no_watermark || item.watermark || item.title || item.cover;
+              if (!videoId || seenVideos.has(videoId)) continue;
+              seenVideos.add(videoId);
+              
+              results.push({
+                id: `tt-${item.author || Math.random().toString()}-${item.cover?.split("/").pop() || Math.random().toString()}`,
+                platform: "tiktok",
+                title: item.title || "TikTok Video",
+                author: item.author || "TikTok User",
+                thumbnail: item.cover || item.origin_cover || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+                duration: "",
+                description: item.title || "TikTok Post",
+                originalUrl: item.author ? `https://www.tiktok.com/@${item.author.replace("@", "")}` : "https://www.tiktok.com",
+                playableAudioUrl: item.music || null,
+                playableVideoUrl: item.no_watermark || item.watermark || null,
+                type: "video" as const,
+                raw: item
+              });
+            }
           }
         }
       } catch (err: any) {
@@ -594,8 +886,18 @@ app.post("/api/media/by-url", async (req, res) => {
       normalized.embedUrl = `https://www.youtube.com/embed/${resObj.videoId}`;
     } else if (normalized.platform === "tiktok") {
       normalized.type = "video";
-      normalized.playableVideoUrl = resObj.no_watermark || resObj.watermark || null;
-      normalized.playableAudioUrl = resObj.music || null;
+      const medias = resObj.medias || [];
+      const videoUrl = medias.find((m: any) => m.type === "video" && m.quality === "no_watermark")?.url || 
+                       medias.find((m: any) => m.type === "video")?.url || 
+                       resObj.no_watermark || 
+                       resObj.watermark || 
+                       null;
+      const audioUrl = medias.find((m: any) => m.type === "audio")?.url || 
+                       resObj.music || 
+                       null;
+      normalized.playableVideoUrl = videoUrl;
+      normalized.playableAudioUrl = audioUrl;
+      normalized.medias = medias;
     } else {
       normalized.type = "video";
       normalized.playableVideoUrl = resObj.url || null;
@@ -652,35 +954,49 @@ app.get("/api/media/yt-download", async (req, res) => {
   const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   const targetUrl = `${base}${endpoint}?url=${encodeURIComponent(url as string)}&apikey=${API_KEY}`;
   
-  console.log(`[YouTube Proxy] Fetching from ${type} server ${serverIndex}: ${targetUrl.replace(API_KEY, "HIDDEN")}`);
+  console.log(`[YouTube Proxy] Fetching or caching from ${type} server ${serverIndex}`);
 
   try {
-    const response = await fetch(targetUrl);
+    const cacheResult = await getOrDownloadMedia(targetUrl, true);
     
-    if (!response.ok) {
-      console.warn(`[YouTube Proxy] Server ${serverIndex} failed with status ${response.status}. Trying fallback server...`);
-      const fallbackServers = ["1", "2", "3"].filter(s => s !== serverIndex);
-      for (const nextSrv of fallbackServers) {
-        const nextEndpoint = type === "video" ? `/api/dl/ytvideo${nextSrv === "1" ? "" : nextSrv}` : `/api/dl/ytaudio${nextSrv === "1" ? "" : nextSrv}`;
-        const nextUrl = `${base}${nextEndpoint}?url=${encodeURIComponent(url as string)}&apikey=${API_KEY}`;
-        console.log(`[YouTube Proxy Fallback] Trying server ${nextSrv}: ${nextUrl.replace(API_KEY, "HIDDEN")}`);
-        
-        try {
-          const nextResponse = await fetch(nextUrl);
-          if (nextResponse.ok) {
-            return await streamResponse(nextResponse, res);
-          }
-        } catch (err: any) {
-          console.error(`[YouTube Proxy Fallback] Server ${nextSrv} failed:`, err.message);
-        }
-      }
-      return res.status(response.status).json({ error: "Todos os servidores de download do YouTube falharam.", code: "YT_DOWNLOAD_FAILED" });
-    }
-
-    return await streamResponse(response, res);
+    const ext = type === "video" ? "mp4" : "mp3";
+    const filename = `youtube_${type}_${Date.now()}.${ext}`;
+    
+    res.setHeader("content-type", cacheResult.contentType);
+    res.setHeader("content-disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader("access-control-allow-origin", "*");
+    
+    return res.sendFile(cacheResult.filePath);
   } catch (error: any) {
-    console.error("[YouTube Proxy Error]:", error);
-    res.status(500).json({ error: "Falha ao processar download do YouTube", details: error.message });
+    console.warn(`[YouTube Proxy Cache Miss] Failed to cache directly. Trying server fallback stream...`);
+    try {
+      const response = await fetch(targetUrl);
+      
+      if (!response.ok) {
+        console.warn(`[YouTube Proxy] Server ${serverIndex} failed with status ${response.status}. Trying fallback server...`);
+        const fallbackServers = ["1", "2", "3"].filter(s => s !== serverIndex);
+        for (const nextSrv of fallbackServers) {
+          const nextEndpoint = type === "video" ? `/api/dl/ytvideo${nextSrv === "1" ? "" : nextSrv}` : `/api/dl/ytaudio${nextSrv === "1" ? "" : nextSrv}`;
+          const nextUrl = `${base}${nextEndpoint}?url=${encodeURIComponent(url as string)}&apikey=${API_KEY}`;
+          console.log(`[YouTube Proxy Fallback] Trying server ${nextSrv}: ${nextUrl.replace(API_KEY, "HIDDEN")}`);
+          
+          try {
+            const nextResponse = await fetch(nextUrl);
+            if (nextResponse.ok) {
+              return await streamResponse(nextResponse, res);
+            }
+          } catch (err: any) {
+            console.error(`[YouTube Proxy Fallback] Server ${nextSrv} failed:`, err.message);
+          }
+        }
+        return res.status(response.status).json({ error: "Todos os servidores de download do YouTube falharam.", code: "YT_DOWNLOAD_FAILED" });
+      }
+
+      return await streamResponse(response, res);
+    } catch (e: any) {
+      console.error("[YouTube Proxy Error]:", e);
+      res.status(500).json({ error: "Falha ao processar download do YouTube", details: e.message });
+    }
   }
 });
 
@@ -723,38 +1039,53 @@ app.get("/api/media/stream-proxy", async (req, res) => {
   }
 
   try {
-    const response = await fetch(mediaUrl);
+    const cacheResult = await getOrDownloadMedia(mediaUrl);
     
-    const contentType = response.headers.get("content-type");
-    if (contentType) {
-      res.setHeader("content-type", contentType);
-    }
-    const contentLength = response.headers.get("content-length");
-    if (contentLength) {
-      res.setHeader("content-length", contentLength);
-    } else {
-      res.setHeader("transfer-encoding", "chunked");
-    }
+    res.setHeader("content-type", cacheResult.contentType);
     res.setHeader("access-control-allow-origin", "*");
+    
+    return res.sendFile(cacheResult.filePath);
+  } catch (err: any) {
+    console.error("Stream proxy cache failure, falling back to direct stream:", err.message);
+    try {
+      const headers: Record<string, string> = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+      };
+      if (mediaUrl.includes("tiktok")) headers["Referer"] = "https://www.tiktok.com/";
+      if (mediaUrl.includes("instagram")) headers["Referer"] = "https://www.instagram.com/";
 
-    if (response.body) {
-      if (typeof response.body.getReader === "function") {
-        const reader = response.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(value);
-        }
+      const response = await fetch(mediaUrl, { headers });
+      const contentType = response.headers.get("content-type");
+      if (contentType) {
+        res.setHeader("content-type", contentType);
+      }
+      const contentLength = response.headers.get("content-length");
+      if (contentLength) {
+        res.setHeader("content-length", contentLength);
       } else {
-        for await (const chunk of response.body as any) {
-          res.write(chunk);
+        res.setHeader("transfer-encoding", "chunked");
+      }
+      res.setHeader("access-control-allow-origin", "*");
+
+      if (response.body) {
+        if (typeof response.body.getReader === "function") {
+          const reader = response.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+        } else {
+          for await (const chunk of response.body as any) {
+            res.write(chunk);
+          }
         }
       }
+      res.end();
+    } catch (fallbackErr: any) {
+      res.status(500).json({ error: "Erro ao retransmitir fluxo de mídia", details: fallbackErr.message });
     }
-    res.end();
-  } catch (err: any) {
-    console.error("Stream proxy error:", err);
-    res.status(500).json({ error: "Erro ao retransmitir fluxo de mídia", details: err.message });
   }
 });
 
@@ -766,41 +1097,56 @@ app.get("/api/media/download-proxy", async (req, res) => {
   }
 
   try {
-    const response = await fetch(mediaUrl);
+    const cacheResult = await getOrDownloadMedia(mediaUrl);
     
-    const contentType = response.headers.get("content-type");
-    if (contentType) {
-      res.setHeader("content-type", contentType);
-    }
-    const contentLength = response.headers.get("content-length");
-    if (contentLength) {
-      res.setHeader("content-length", contentLength);
-    } else {
-      res.setHeader("transfer-encoding", "chunked");
-    }
-    
-    // Set attachment content-disposition to force download
+    res.setHeader("content-type", cacheResult.contentType);
     res.setHeader("content-disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
     res.setHeader("access-control-allow-origin", "*");
+    
+    return res.sendFile(cacheResult.filePath);
+  } catch (err: any) {
+    console.error("Download proxy cache failure, falling back to direct download:", err.message);
+    try {
+      const headers: Record<string, string> = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+      };
+      if (mediaUrl.includes("tiktok")) headers["Referer"] = "https://www.tiktok.com/";
+      if (mediaUrl.includes("instagram")) headers["Referer"] = "https://www.instagram.com/";
 
-    if (response.body) {
-      if (typeof response.body.getReader === "function") {
-        const reader = response.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(value);
-        }
+      const response = await fetch(mediaUrl, { headers });
+      const contentType = response.headers.get("content-type");
+      if (contentType) {
+        res.setHeader("content-type", contentType);
+      }
+      const contentLength = response.headers.get("content-length");
+      if (contentLength) {
+        res.setHeader("content-length", contentLength);
       } else {
-        for await (const chunk of response.body as any) {
-          res.write(chunk);
+        res.setHeader("transfer-encoding", "chunked");
+      }
+      
+      res.setHeader("content-disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader("access-control-allow-origin", "*");
+
+      if (response.body) {
+        if (typeof response.body.getReader === "function") {
+          const reader = response.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+        } else {
+          for await (const chunk of response.body as any) {
+            res.write(chunk);
+          }
         }
       }
+      res.end();
+    } catch (fallbackErr: any) {
+      res.status(500).json({ error: "Erro ao baixar arquivo", details: fallbackErr.message });
     }
-    res.end();
-  } catch (err: any) {
-    console.error("Download proxy error:", err);
-    res.status(500).json({ error: "Erro ao baixar arquivo", details: err.message });
   }
 });
 
