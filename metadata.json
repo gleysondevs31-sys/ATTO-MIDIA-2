@@ -1,0 +1,6 @@
+{
+  "name": "Zero Two Media Hub",
+  "description": "Plataforma avançada para pesquisa, localização e reprodução de mídias de redes sociais como TikTok, YouTube, Instagram e Spotify.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
