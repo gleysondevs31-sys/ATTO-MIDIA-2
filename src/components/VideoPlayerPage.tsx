@@ -16,7 +16,8 @@ import {
   ChevronUp, 
   Youtube, 
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  SkipForward
 } from "lucide-react";
 import { NormalizedMedia } from "../types";
 
@@ -25,13 +26,17 @@ interface VideoPlayerPageProps {
   relatedMedias: NormalizedMedia[];
   onPlay: (media: NormalizedMedia) => void;
   onBackToExplore: () => void;
+  isAutoplayEnabled: boolean;
+  onToggleAutoplay: () => void;
 }
 
 export function VideoPlayerPage({ 
   activeMedia, 
   relatedMedias, 
   onPlay, 
-  onBackToExplore 
+  onBackToExplore,
+  isAutoplayEnabled,
+  onToggleAutoplay
 }: VideoPlayerPageProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -178,6 +183,30 @@ export function VideoPlayerPage({
     setError("O player de vídeo falhou ao carregar a mídia. A URL upstream pode ter expirado ou exige requisição autenticada.");
   };
 
+  const handleSkipNext = () => {
+    if (!activeMedia) return;
+    const currentIndex = relatedMedias.findIndex((item) => item.id === activeMedia.id);
+    if (currentIndex !== -1 && currentIndex < relatedMedias.length - 1) {
+      const nextMedia = relatedMedias.slice(currentIndex + 1).find((item) => item.type === "video");
+      if (nextMedia) {
+        onPlay(nextMedia);
+        return;
+      }
+    }
+    // Wrap around
+    const firstVideo = relatedMedias.find((item) => item.type === "video");
+    if (firstVideo && firstVideo.id !== activeMedia.id) {
+      onPlay(firstVideo);
+    }
+  };
+
+  const handleVideoEnded = () => {
+    setIsPlaying(false);
+    if (isAutoplayEnabled) {
+      handleSkipNext();
+    }
+  };
+
   const formatTime = (secs: number) => {
     if (isNaN(secs)) return "0:00";
     const mins = Math.floor(secs / 60);
@@ -286,7 +315,7 @@ export function VideoPlayerPage({
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onError={handleVideoError}
-              onEnded={() => setIsPlaying(false)}
+              onEnded={handleVideoEnded}
               controls={false} // Use custom styled controls!
             />
           )}
@@ -361,6 +390,16 @@ export function VideoPlayerPage({
                   {isPlaying ? <Pause className="w-4 h-4 fill-zinc-950" /> : <Play className="w-4 h-4 fill-zinc-950 ml-0.5" />}
                 </button>
 
+                <button
+                  id="btn-cinema-next"
+                  onClick={handleSkipNext}
+                  disabled={isLoading}
+                  className="p-2 bg-[#111111]/80 hover:bg-[#1a1a1a] text-white border border-white/5 hover:border-white/15 rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                  title="Próximo Vídeo (Autoplay)"
+                >
+                  <SkipForward className="w-3.5 h-3.5 fill-white" />
+                </button>
+
                 {/* Volume slider */}
                 <div className="flex items-center gap-1.5 group/vol">
                   <button
@@ -400,6 +439,21 @@ export function VideoPlayerPage({
 
               {/* Action utilities right side */}
               <div className="flex items-center gap-2">
+                {/* Autoplay status button */}
+                <button
+                  id="btn-cinema-autoplay-toggle"
+                  onClick={onToggleAutoplay}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all border ${
+                    isAutoplayEnabled 
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" 
+                      : "bg-[#111111]/80 text-gray-400 border-white/5 hover:border-white/10"
+                  }`}
+                  title={isAutoplayEnabled ? "Desativar Reprodução Automática" : "Ativar Reprodução Automática"}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isAutoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
+                  <span>AUTOPLAY: {isAutoplayEnabled ? "LIGADO" : "DESLIGADO"}</span>
+                </button>
+
                 <button
                   onClick={handleFullscreen}
                   className="p-1.5 text-gray-300 hover:text-white transition-colors"

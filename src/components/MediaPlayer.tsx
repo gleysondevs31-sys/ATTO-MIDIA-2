@@ -1,13 +1,16 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, X, Maximize2, ExternalLink, Music, Video, Loader2 } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, X, Maximize2, ExternalLink, Music, Video, Loader2, SkipForward } from "lucide-react";
 import { NormalizedMedia } from "../types";
 
 interface MediaPlayerProps {
   media: NormalizedMedia | null;
   onClose: () => void;
+  isAutoplayEnabled: boolean;
+  onToggleAutoplay: () => void;
+  onPlayNext: () => void;
 }
 
-export function MediaPlayer({ media, onClose }: MediaPlayerProps) {
+export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutoplay, onPlayNext }: MediaPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -144,6 +147,13 @@ export function MediaPlayer({ media, onClose }: MediaPlayerProps) {
     console.error("HTML5 audio playback failure");
   };
 
+  const handleMediaEnded = () => {
+    setIsPlaying(false);
+    if (isAutoplayEnabled) {
+      onPlayNext();
+    }
+  };
+
   const hasQualities = media?.medias && media.medias.length > 0;
 
   if (!media) return null;
@@ -160,7 +170,7 @@ export function MediaPlayer({ media, onClose }: MediaPlayerProps) {
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onError={handleVideoError}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={handleMediaEnded}
         />
       ) : (
         <audio
@@ -171,7 +181,7 @@ export function MediaPlayer({ media, onClose }: MediaPlayerProps) {
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onError={handleAudioError}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={handleMediaEnded}
         />
       )}
 
@@ -235,6 +245,21 @@ export function MediaPlayer({ media, onClose }: MediaPlayerProps) {
                 <Play className="w-5 h-5 fill-zinc-950 ml-0.5" />
               )}
             </button>
+
+            {/* Skip Next */}
+            <button
+              id="btn-player-next"
+              onClick={onPlayNext}
+              disabled={isMediaLoading}
+              className={`p-2.5 rounded-full border border-white/5 transition-all ${
+                isMediaLoading
+                  ? "text-gray-600 bg-transparent cursor-not-allowed"
+                  : "text-gray-300 hover:text-white bg-[#111111]/80 hover:bg-[#1a1a1a] hover:border-white/10 active:scale-95 cursor-pointer"
+              }`}
+              title="Próxima Faixa (Autoplay)"
+            >
+              <SkipForward className="w-3.5 h-3.5 fill-current" />
+            </button>
           </div>
 
           {/* Progress Timeline slider */}
@@ -277,6 +302,21 @@ export function MediaPlayer({ media, onClose }: MediaPlayerProps) {
               </select>
             </div>
           )}
+
+          {/* Autoplay Toggle */}
+          <button
+            id="btn-player-autoplay-toggle"
+            onClick={onToggleAutoplay}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-mono font-bold transition-all border ${
+              isAutoplayEnabled 
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" 
+                : "bg-[#111111]/80 text-gray-500 border-white/5 hover:border-white/10"
+            }`}
+            title={isAutoplayEnabled ? "Desativar Reprodução Automática" : "Ativar Reprodução Automática"}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isAutoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
+            <span>AUTOPLAY: {isAutoplayEnabled ? "ON" : "OFF"}</span>
+          </button>
 
           {/* Volume Control */}
           <div className="flex items-center gap-2">

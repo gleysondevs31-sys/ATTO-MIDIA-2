@@ -1,14 +1,16 @@
 import React from "react";
-import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2 } from "lucide-react";
+import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2, Heart } from "lucide-react";
 import { NormalizedMedia } from "../types";
 
 interface MediaDetailsModalProps {
   media: NormalizedMedia | null;
   onClose: () => void;
   onPlay: (media: NormalizedMedia) => void;
+  isFavorited?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-export function MediaDetailsModal({ media, onClose, onPlay }: MediaDetailsModalProps) {
+export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false, onToggleFavorite }: MediaDetailsModalProps) {
   if (!media) return null;
 
   const playAudio = () => {
@@ -102,19 +104,36 @@ export function MediaDetailsModal({ media, onClose, onPlay }: MediaDetailsModalP
                 </h3>
               </div>
               
-              <button
-                id="btn-modal-play-cta"
-                onClick={() => {
-                  if (media.type === "video") {
-                    playVideo();
-                  } else {
-                    playAudio();
-                  }
-                }}
-                className="p-4 bg-primary hover:bg-primary-hover text-white rounded-full shadow-lg shadow-rose-950/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shrink-0"
-              >
-                <Play className="w-6 h-6 fill-white ml-0.5" />
-              </button>
+              <div className="flex items-center gap-2.5 shrink-0">
+                {onToggleFavorite && (
+                  <button
+                    id="btn-modal-favorite-cta"
+                    onClick={onToggleFavorite}
+                    title={isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
+                    className={`p-4 rounded-full border transition-all flex items-center justify-center cursor-pointer active:scale-95 hover:scale-105 ${
+                      isFavorited
+                        ? "bg-rose-500/15 border-rose-500/30 text-rose-500 hover:bg-rose-500/25"
+                        : "bg-black/60 border-white/10 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <Heart className={`w-6 h-6 ${isFavorited ? "fill-current" : ""}`} />
+                  </button>
+                )}
+
+                <button
+                  id="btn-modal-play-cta"
+                  onClick={() => {
+                    if (media.type === "video") {
+                      playVideo();
+                    } else {
+                      playAudio();
+                    }
+                  }}
+                  className="p-4 bg-primary hover:bg-primary-hover text-white rounded-full shadow-lg shadow-rose-950/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                >
+                  <Play className="w-6 h-6 fill-white ml-0.5" />
+                </button>
+              </div>
             </div>
           </div>
 

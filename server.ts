@@ -5,6 +5,9 @@ import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import crypto from "crypto";
 import tiktok from "@tobyg74/tiktok-api-dl";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { pool, bootstrapDatabase } from "./src/db.ts";
 
 // Load environment variables
 dotenv.config();
@@ -301,6 +304,50 @@ async function searchTikTokUrls(query: string): Promise<string[]> {
   }
 }
 
+// Helper function to query Yahoo Search for TikTok video URLs based on a query
+async function searchTikTokYahoo(query: string): Promise<string[]> {
+  const url = `https://search.yahoo.com/search?p=site:tiktok.com+${encodeURIComponent(query)}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    });
+    if (!res.ok) {
+      throw new Error(`Yahoo responded with status ${res.status}`);
+    }
+    const html = await res.text();
+    const urls: string[] = [];
+    
+    // Yahoo URLs are usually inside RU=https%3a%2f%2fwww.tiktok.com%2f...
+    const regex = /RU=([^/&]+)/g;
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      try {
+        const decoded = decodeURIComponent(match[1]);
+        if (decoded.includes("tiktok.com/") && decoded.includes("/video/")) {
+          urls.push(decoded);
+        }
+      } catch {}
+    }
+    
+    // Also look for direct links in the HTML
+    const directRegex = /href="https?:\/\/(www\.)?tiktok\.com\/([^"\s>]+)"/g;
+    while ((match = directRegex.exec(html)) !== null) {
+      const fullUrl = `https://www.tiktok.com/${match[2]}`.split(/[?"'\s<>]/)[0];
+      if (fullUrl.includes("/video/")) {
+        urls.push(fullUrl);
+      }
+    }
+    
+    return Array.from(new Set(urls)).slice(0, 10);
+  } catch (e: any) {
+    console.error("[searchTikTokYahoo error]:", e.message);
+    return [];
+  }
+}
+
 // Fetch details for a specific TikTok URL with failover across multiple endpoints
 async function fetchTikTokDetails(url: string): Promise<any | null> {
   // 1. Try TobyG74 tiktok-api-dl (v3 MusicalDown) first
@@ -504,12 +551,17 @@ app.get("/api/search", async (req, res) => {
       }
     }
 
-    // 4. TikTok Search (Enhanced: fetches multiple real search results using DDG scraper and falls back to username search)
+    // 4. TikTok Search (Enhanced: layered search with Yahoo, DDG, and Username variation fallback)
     if (platform === "tiktok" || platform === "all") {
       try {
         const seenVideos = new Set<string>();
-        const tURLs = await searchTikTokUrls(query);
-        console.log(`[TikTok Search] Found ${tURLs.length} URLs from DDG for query: ${query}`);
+        let tURLs = await searchTikTokYahoo(query);
+        console.log(`[TikTok Search] Found ${tURLs.length} URLs from Yahoo for query: ${query}`);
+        
+        if (tURLs.length === 0) {
+          tURLs = await searchTikTokUrls(query);
+          console.log(`[TikTok Search] Found ${tURLs.length} URLs from DDG for query: ${query}`);
+        }
         
         if (tURLs.length > 0) {
           // Fetch details for up to 8 unique URLs in parallel
@@ -524,7 +576,7 @@ app.get("/api/search", async (req, res) => {
               seenVideos.add(videoId);
               
               results.push({
-                id: `tt-${Buffer.from(item.originalUrl).toString("base64").substring(0, 15)}`,
+                id: `tt-${crypto.createHash("md5").update(item.originalUrl).digest("hex")}`,
                 platform: "tiktok",
                 title: item.title,
                 author: item.author,
@@ -541,9 +593,9 @@ app.get("/api/search", async (req, res) => {
           }
         }
 
-        // Fallback to username variations if DDG search yielded 0 results
+        // Fallback to username variations if search yielded 0 results
         if (results.filter(r => r.platform === "tiktok").length === 0) {
-          console.log("[TikTok Search] DuckDuckGo search yielded 0 results. Running username search fallback...");
+          console.log("[TikTok Search] Direct search yielded 0 results. Running username search fallback...");
           const cleanQuery = query.toLowerCase().trim().replace(/\s+/g, "_");
           const spacelessQuery = query.toLowerCase().trim().replace(/\s+/g, "");
           
@@ -789,6 +841,31 @@ app.get("/api/media/resolve", async (req, res) => {
       }
     }
 
+    if (platform === "tiktok" || url.includes("tiktok.com")) {
+      try {
+        const ttDetails = await fetchTikTokDetails(url);
+        if (ttDetails) {
+          const resolved = {
+            id: `tt-${crypto.createHash("md5").update(url).digest("hex")}`,
+            platform: "tiktok",
+            title: ttDetails.title || "TikTok Video",
+            author: ttDetails.author || "TikTok User",
+            thumbnail: ttDetails.thumbnail || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+            duration: "",
+            description: ttDetails.title || "",
+            originalUrl: url,
+            type: "video" as const,
+            playableVideoUrl: ttDetails.playableVideoUrl,
+            playableAudioUrl: ttDetails.playableAudioUrl,
+            raw: ttDetails.raw
+          };
+          return res.json({ status: true, resolved });
+        }
+      } catch (err: any) {
+        console.warn("fetchTikTokDetails failed in GET /api/media/resolve, falling back:", err.message);
+      }
+    }
+
     // Standard URL Multi-downloader parser
     const rawData = await fetchFromZeroTwo("/api/dl/multidl", { url });
     if (!rawData || !rawData.resultado) {
@@ -854,6 +931,31 @@ app.post("/api/media/by-url", async (req, res) => {
   }
 
   try {
+    if (url.includes("tiktok.com")) {
+      try {
+        const ttDetails = await fetchTikTokDetails(url);
+        if (ttDetails) {
+          const normalized = {
+            id: `tt-${crypto.createHash("md5").update(url).digest("hex")}`,
+            platform: "tiktok",
+            title: ttDetails.title || "TikTok Video",
+            author: ttDetails.author || "TikTok User",
+            thumbnail: ttDetails.thumbnail || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+            duration: "",
+            description: ttDetails.title || "",
+            originalUrl: url,
+            type: "video" as const,
+            playableVideoUrl: ttDetails.playableVideoUrl,
+            playableAudioUrl: ttDetails.playableAudioUrl,
+            raw: ttDetails.raw
+          };
+          return res.json({ status: true, media: normalized });
+        }
+      } catch (err: any) {
+        console.warn("fetchTikTokDetails failed in POST /api/media/by-url, falling back:", err.message);
+      }
+    }
+
     const rawData = await fetchFromZeroTwo("/api/dl/multidl", { url });
     if (!rawData || !rawData.resultado) {
       return res.status(404).json({ 
@@ -1151,9 +1253,608 @@ app.get("/api/media/download-proxy", async (req, res) => {
 });
 
 // ==========================================
+// USER AUTHENTICATION & PROFILES SYSTEM (POSTGRESQL)
+// ==========================================
+
+const JWT_SECRET = process.env.JWT_SECRET || "zerotwo-jwt-secret-key-1337-!";
+
+interface AuthRequest extends express.Request {
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+  };
+}
+
+// Authentication middleware
+function authenticateToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ error: "Token de autenticação não fornecido" });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) {
+      return res.status(403).json({ error: "Sua sessão expirou ou o token é inválido. Faça login novamente." });
+    }
+    (req as AuthRequest).user = user;
+    next();
+  });
+}
+
+// Register Route
+app.post("/api/auth/register", async (req, res) => {
+  const { username, email, password } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: "Preencha todos os campos obrigatórios (nome, email e senha)" });
+  }
+
+  try {
+    // Check if user already exists
+    const userCheck = await pool.query(
+      "SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2)",
+      [username.trim(), email.trim()]
+    );
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ error: "Nome de usuário ou e-mail já cadastrado no sistema" });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Count existing users to see if they're the first user
+    const usersCountRes = await pool.query("SELECT COUNT(*) FROM users");
+    const totalUsers = parseInt(usersCountRes.rows[0].count);
+    
+    // Set role to 'admin' if first user or contains 'admin'
+    const isFirstUser = totalUsers === 0;
+    const isNamedAdmin = username.toLowerCase().includes("admin") || email.toLowerCase().includes("admin");
+    const roleToAssign = (isFirstUser || isNamedAdmin) ? "admin" : "user";
+
+    // Insert user
+    const insertRes = await pool.query(
+      `INSERT INTO users (username, email, password, role) 
+       VALUES ($1, $2, $3, $4) 
+       RETURNING id, username, email, avatar, bio, role, theme, created_at`,
+      [username.trim(), email.trim().toLowerCase(), hashedPassword, roleToAssign]
+    );
+
+    const user = insertRes.rows[0];
+
+    // Generate JWT Token
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({ status: true, token, user });
+  } catch (err: any) {
+    console.error("[Register Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao cadastrar usuário", details: err.message });
+  }
+});
+
+// Login Route
+app.post("/api/auth/login", async (req, res) => {
+  const { identifier, password } = req.body;
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: "Identificador (nome de usuário ou e-mail) e senha são obrigatórios" });
+  }
+
+  try {
+    const userRes = await pool.query(
+      "SELECT * FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1)",
+      [identifier.trim()]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(400).json({ error: "Usuário ou senha incorretos" });
+    }
+
+    const user = userRes.rows[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(400).json({ error: "Usuário ou senha incorretos" });
+    }
+
+    // Generate JWT Token
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Delete password from output
+    delete user.password;
+
+    return res.json({ status: true, token, user });
+  } catch (err: any) {
+    console.error("[Login Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao autenticar usuário", details: err.message });
+  }
+});
+
+// Get User Profile Route
+app.get("/api/auth/profile", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    const userRes = await pool.query(
+      "SELECT id, username, email, avatar, bio, role, theme, created_at FROM users WHERE id = $1",
+      [authReq.user.id]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    return res.json({ status: true, user: userRes.rows[0] });
+  } catch (err: any) {
+    console.error("[Get Profile Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao buscar perfil do usuário" });
+  }
+});
+
+// Update User Profile Route
+app.put("/api/auth/profile", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { username, avatar, bio, theme } = req.body;
+
+  try {
+    // Validate unique username if changed
+    if (username && username.trim().toLowerCase() !== authReq.user.username.toLowerCase()) {
+      const checkRes = await pool.query(
+        "SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2",
+        [username.trim(), authReq.user.id]
+      );
+      if (checkRes.rows.length > 0) {
+        return res.status(400).json({ error: "Este nome de usuário já está em uso por outro perfil" });
+      }
+    }
+
+    const updateRes = await pool.query(
+      `UPDATE users 
+       SET username = COALESCE($1, username), 
+           avatar = COALESCE($2, avatar), 
+           bio = COALESCE($3, bio), 
+           theme = COALESCE($4, theme) 
+       WHERE id = $5 
+       RETURNING id, username, email, avatar, bio, role, theme, created_at`,
+      [
+        username ? username.trim() : null,
+        avatar ? avatar.trim() : null,
+        bio ? bio.trim() : null,
+        theme ? theme.trim() : null,
+        authReq.user.id
+      ]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "Perfil não encontrado para atualização" });
+    }
+
+    return res.json({ status: true, user: updateRes.rows[0] });
+  } catch (err: any) {
+    console.error("[Update Profile Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao atualizar dados do perfil" });
+  }
+});
+
+// Get User Favorites Route
+app.get("/api/favorites", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    const favoritesRes = await pool.query(
+      "SELECT * FROM favorites WHERE user_id = $1 ORDER BY created_at DESC",
+      [authReq.user.id]
+    );
+
+    // Normalize favorites to match the NormalizedMedia type structure
+    const favorites = favoritesRes.rows.map((row) => ({
+      id: row.media_id,
+      platform: row.platform,
+      title: row.title,
+      author: row.author,
+      thumbnail: row.thumbnail,
+      duration: row.duration,
+      description: row.description,
+      originalUrl: row.original_url,
+      playableAudioUrl: row.playable_audio_url,
+      playableVideoUrl: row.playable_video_url,
+      type: row.type,
+      favoriteDbId: row.id,
+      createdAt: row.created_at
+    }));
+
+    return res.json({ status: true, favorites });
+  } catch (err: any) {
+    console.error("[Get Favorites Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao obter lista de favoritos" });
+  }
+});
+
+// Save Favorite Route
+app.post("/api/favorites", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const {
+    id,
+    platform,
+    title,
+    author,
+    thumbnail,
+    duration,
+    description,
+    originalUrl,
+    playableAudioUrl,
+    playableVideoUrl,
+    type
+  } = req.body;
+
+  if (!id || !originalUrl || !title) {
+    return res.status(400).json({ error: "Informações de mídia incompletas para salvar nos favoritos" });
+  }
+
+  try {
+    const insertRes = await pool.query(
+      `INSERT INTO favorites (
+        user_id, media_id, platform, title, author, thumbnail, duration, description, original_url, playable_audio_url, playable_video_url, type
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ON CONFLICT (user_id, original_url) 
+      DO UPDATE SET 
+        title = EXCLUDED.title,
+        thumbnail = EXCLUDED.thumbnail,
+        playable_audio_url = EXCLUDED.playable_audio_url,
+        playable_video_url = EXCLUDED.playable_video_url
+      RETURNING *`,
+      [
+        authReq.user.id,
+        id,
+        platform || "unknown",
+        title,
+        author || "Desconhecido",
+        thumbnail || "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=120&auto=format&fit=crop&q=60",
+        duration || "",
+        description || "",
+        originalUrl,
+        playableAudioUrl || null,
+        playableVideoUrl || null,
+        type || "audio"
+      ]
+    );
+
+    const row = insertRes.rows[0];
+    const savedFavorite = {
+      id: row.media_id,
+      platform: row.platform,
+      title: row.title,
+      author: row.author,
+      thumbnail: row.thumbnail,
+      duration: row.duration,
+      description: row.description,
+      originalUrl: row.original_url,
+      playableAudioUrl: row.playable_audio_url,
+      playableVideoUrl: row.playable_video_url,
+      type: row.type,
+      favoriteDbId: row.id,
+      createdAt: row.created_at
+    };
+
+    return res.json({ status: true, favorite: savedFavorite });
+  } catch (err: any) {
+    console.error("[Save Favorite Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao salvar mídia nos favoritos" });
+  }
+});
+
+// Remove Favorite Route
+app.delete("/api/favorites", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { originalUrl } = req.body;
+
+  if (!originalUrl) {
+    return res.status(400).json({ error: "A URL original da mídia é obrigatória para exclusão" });
+  }
+
+  try {
+    const deleteRes = await pool.query(
+      "DELETE FROM favorites WHERE user_id = $1 AND original_url = $2 RETURNING id",
+      [authReq.user.id, originalUrl]
+    );
+
+    if (deleteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Favorito não encontrado para esta conta" });
+    }
+
+    return res.json({ status: true, message: "Mídia removida dos favoritos com sucesso!" });
+  } catch (err: any) {
+    console.error("[Remove Favorite Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao remover favorito" });
+  }
+});
+
+// Fetch Search History
+app.get("/api/history", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    const historyRes = await pool.query(
+      "SELECT query, timestamp FROM search_history WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 30",
+      [authReq.user.id]
+    );
+
+    return res.json({ status: true, history: historyRes.rows });
+  } catch (err: any) {
+    console.error("[Get History Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao buscar histórico de pesquisa" });
+  }
+});
+
+// Save Search Query to History
+app.post("/api/history", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { query, timestamp } = req.body;
+
+  if (!query) {
+    return res.status(400).json({ error: "A consulta de pesquisa é obrigatória" });
+  }
+
+  try {
+    // Delete any old identical queries first to avoid duplicates in display order
+    await pool.query(
+      "DELETE FROM search_history WHERE user_id = $1 AND LOWER(query) = LOWER($2)",
+      [authReq.user.id, query.trim()]
+    );
+
+    await pool.query(
+      "INSERT INTO search_history (user_id, query, timestamp) VALUES ($1, $2, $3)",
+      [authReq.user.id, query.trim(), timestamp || Date.now()]
+    );
+
+    return res.json({ status: true });
+  } catch (err: any) {
+    console.error("[Save History Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao salvar histórico de pesquisa" });
+  }
+});
+
+// Clear Search History
+app.delete("/api/history", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    await pool.query("DELETE FROM search_history WHERE user_id = $1", [authReq.user.id]);
+    return res.json({ status: true, message: "Histórico limpo com sucesso!" });
+  } catch (err: any) {
+    console.error("[Clear History Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao limpar histórico" });
+  }
+});
+
+// ==========================================
+// ADMIN PANEL MANAGEMENT SYSTEM (POSTGRESQL)
+// ==========================================
+
+// Middleware to authorize admin routes
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authReq = req as AuthRequest;
+  if (!authReq.user || authReq.user.role !== "admin") {
+    return res.status(403).json({ error: "Acesso negado: área exclusiva para administradores." });
+  }
+  next();
+}
+
+// 1. Get Platform Stats
+app.get("/api/admin/stats", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const usersCount = await pool.query("SELECT COUNT(*) FROM users");
+    const favsCount = await pool.query("SELECT COUNT(*) FROM favorites");
+    const historyCount = await pool.query("SELECT COUNT(*) FROM search_history");
+
+    const platformFavsBreakdown = await pool.query(
+      "SELECT platform, COUNT(*) as count FROM favorites GROUP BY platform ORDER BY count DESC"
+    );
+
+    const activeUsersRes = await pool.query(
+      `SELECT u.username, COUNT(sh.id) as search_count 
+       FROM users u 
+       JOIN search_history sh ON u.id = sh.user_id 
+       GROUP BY u.id 
+       ORDER BY search_count DESC LIMIT 5`
+    );
+
+    return res.json({
+      status: true,
+      stats: {
+        totalUsers: parseInt(usersCount.rows[0].count),
+        totalFavorites: parseInt(favsCount.rows[0].count),
+        totalQueries: parseInt(historyCount.rows[0].count),
+        platformBreakdown: platformFavsBreakdown.rows,
+        topActiveUsers: activeUsersRes.rows,
+      }
+    });
+  } catch (err: any) {
+    console.error("[Admin Stats Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao carregar estatísticas do sistema" });
+  }
+});
+
+// 2. List All Users with Stats
+app.get("/api/admin/users", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const usersRes = await pool.query(
+      `SELECT u.id, u.username, u.email, u.avatar, u.bio, u.role, u.created_at,
+              COALESCE(fav.fav_count, 0) as favorites_count,
+              COALESCE(hist.hist_count, 0) as search_count
+       FROM users u
+       LEFT JOIN (
+         SELECT user_id, COUNT(*) as fav_count FROM favorites GROUP BY user_id
+       ) fav ON u.id = fav.user_id
+       LEFT JOIN (
+         SELECT user_id, COUNT(*) as hist_count FROM search_history GROUP BY user_id
+       ) hist ON u.id = hist.user_id
+       ORDER BY u.id ASC`
+    );
+
+    return res.json({ status: true, users: usersRes.rows });
+  } catch (err: any) {
+    console.error("[Admin List Users Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao listar usuários do sistema" });
+  }
+});
+
+// 3. Update User Role
+app.put("/api/admin/users/:id/role", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+
+  if (role !== "admin" && role !== "user") {
+    return res.status(400).json({ error: "Apenas as funções 'user' e 'admin' são permitidas." });
+  }
+
+  try {
+    const updateRes = await pool.query(
+      "UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, email, role",
+      [role, id]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado para atualizar cargo." });
+    }
+
+    return res.json({ status: true, user: updateRes.rows[0] });
+  } catch (err: any) {
+    console.error("[Admin Update Role Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao atualizar permissões do usuário" });
+  }
+});
+
+// 4. Update User Profile (as Admin)
+app.put("/api/admin/users/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { username, email, bio, avatar } = req.body;
+
+  try {
+    // Validate email uniqueness if changed
+    if (email) {
+      const emailCheck = await pool.query(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2",
+        [email.trim(), id]
+      );
+      if (emailCheck.rows.length > 0) {
+        return res.status(400).json({ error: "Este endereço de e-mail já está em uso." });
+      }
+    }
+
+    const updateRes = await pool.query(
+      `UPDATE users 
+       SET username = COALESCE($1, username), 
+           email = COALESCE($2, email),
+           avatar = COALESCE($3, avatar), 
+           bio = COALESCE($4, bio) 
+       WHERE id = $5 
+       RETURNING id, username, email, avatar, bio, role, created_at`,
+      [
+        username ? username.trim() : null,
+        email ? email.trim().toLowerCase() : null,
+        avatar ? avatar.trim() : null,
+        bio ? bio.trim() : null,
+        id
+      ]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    return res.json({ status: true, user: updateRes.rows[0] });
+  } catch (err: any) {
+    console.error("[Admin Edit User Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao atualizar perfil do usuário" });
+  }
+});
+
+// 5. Delete User (and all Cascade data)
+app.delete("/api/admin/users/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const authReq = req as AuthRequest;
+
+  if (parseInt(id) === authReq.user?.id) {
+    return res.status(400).json({ error: "Você não pode excluir sua própria conta de administrador ativa!" });
+  }
+
+  try {
+    const deleteRes = await pool.query("DELETE FROM users WHERE id = $1 RETURNING id, username", [id]);
+
+    if (deleteRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado para remoção." });
+    }
+
+    return res.json({ status: true, message: `Usuário '${deleteRes.rows[0].username}' excluído com sucesso.` });
+  } catch (err: any) {
+    console.error("[Admin Delete User Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao excluir conta de usuário" });
+  }
+});
+
+// 6. Get Comprehensive Activity Feed Logs
+app.get("/api/admin/logs", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Recent searches across all users
+    const recentSearches = await pool.query(
+      `SELECT sh.id, sh.query, sh.timestamp, u.username, u.email, u.avatar
+       FROM search_history sh
+       JOIN users u ON sh.user_id = u.id
+       ORDER BY sh.created_at DESC LIMIT 50`
+    );
+
+    // Recent favorites across all users
+    const recentFavorites = await pool.query(
+      `SELECT f.id, f.title, f.platform, f.created_at, u.username, u.email, u.avatar
+       FROM favorites f
+       JOIN users u ON f.user_id = u.id
+       ORDER BY f.created_at DESC LIMIT 50`
+    );
+
+    return res.json({
+      status: true,
+      logs: {
+        searches: recentSearches.rows,
+        favorites: recentFavorites.rows,
+      }
+    });
+  } catch (err: any) {
+    console.error("[Admin Activity Feed Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao obter feed de atividade do sistema" });
+  }
+});
+
+// ==========================================
 // VITE DEV & PRODUCTION STATIC APP ROUTING
 // ==========================================
 async function startServer() {
+  // Ensure the PostgreSQL database is bootstrapped on server start-up
+  await bootstrapDatabase();
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

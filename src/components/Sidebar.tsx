@@ -1,5 +1,5 @@
 import React from "react";
-import { History, LayoutGrid, Music, HelpCircle, Trash2, ExternalLink, Youtube, Play, Check, Compass, Film } from "lucide-react";
+import { History, LayoutGrid, Music, HelpCircle, Trash2, ExternalLink, Youtube, Play, Check, Compass, Film, Heart, Settings, LogIn, User, Shield, Info } from "lucide-react";
 import { SearchHistoryItem } from "../types";
 
 interface SidebarProps {
@@ -8,9 +8,11 @@ interface SidebarProps {
   onSelectHistory: (query: string) => void;
   selectedPlatform: string;
   onSelectPlatform: (platform: string) => void;
-  currentView: "explore" | "video-player";
-  onSelectView: (view: "explore" | "video-player") => void;
+  currentView: "explore" | "video-player" | "favorites" | "profile" | "admin" | "landing";
+  onSelectView: (view: "explore" | "video-player" | "favorites" | "profile" | "admin" | "landing") => void;
   hasActiveVideo: boolean;
+  user: any;
+  onOpenAuth: () => void;
 }
 
 export function Sidebar({
@@ -21,7 +23,9 @@ export function Sidebar({
   onSelectPlatform,
   currentView,
   onSelectView,
-  hasActiveVideo
+  hasActiveVideo,
+  user,
+  onOpenAuth
 }: SidebarProps) {
   
   const platforms = [
@@ -35,12 +39,90 @@ export function Sidebar({
   return (
     <aside id="app-sidebar" className="w-full lg:w-72 bg-[#080808] border-r border-white/5 p-6 flex flex-col gap-6 flex-shrink-0">
       
-      {/* View Switcher Tabs */}
+      {/* User Section (Auth) */}
       <div className="space-y-3">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-500">
+          Sua Conta (PostgreSQL)
+        </h3>
+        {user ? (
+          <div className="bg-[#111111]/40 border border-white/5 p-3.5 rounded-xl space-y-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#111111] p-1 flex items-center justify-center border border-white/10 shrink-0">
+                <img src={user.avatar} alt="Avatar" className="w-full h-full object-contain" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-bold text-white truncate">{user.username}</h4>
+                <p className="text-[9px] font-mono text-emerald-400 truncate flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Logado no Postgres</span>
+                </p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+              <button
+                id="btn-sidebar-nav-favorites"
+                onClick={() => onSelectView("favorites")}
+                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold font-mono transition-all border ${
+                  currentView === "favorites"
+                    ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                    : "bg-[#111111] border-white/5 text-gray-400 hover:text-white"
+                }`}
+              >
+                <Heart className="w-3 h-3 fill-current" />
+                <span>FAVORITOS</span>
+              </button>
+              <button
+                id="btn-sidebar-nav-profile"
+                onClick={() => onSelectView("profile")}
+                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold font-mono transition-all border ${
+                  currentView === "profile"
+                    ? "bg-primary/10 border-primary/20 text-primary"
+                    : "bg-[#111111] border-white/5 text-gray-400 hover:text-white"
+                }`}
+              >
+                <Settings className="w-3 h-3" />
+                <span>PERFIL</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-[#111111]/20 border border-dashed border-white/5 p-4 rounded-xl text-center space-y-3">
+            <p className="text-[11px] text-zinc-500 leading-normal">
+              Faça login para salvar favoritos e sincronizar seu histórico no banco.
+            </p>
+            <button
+              id="btn-sidebar-login"
+              onClick={onOpenAuth}
+              className="w-full bg-gradient-to-r from-primary to-rose-700 hover:from-rose-500 hover:to-rose-800 text-white font-bold font-mono uppercase tracking-wider rounded-xl py-2.5 text-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Entrar / Cadastrar</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* View Switcher Tabs */}
+      <div className="space-y-3 border-t border-white/5 pt-5">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-500">
           Navegação Principal
         </h3>
         <div className="flex flex-col gap-1.5">
+          {/* Apresentação (Landing) tab */}
+          <button
+            id="btn-nav-landing"
+            onClick={() => onSelectView("landing")}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+              currentView === "landing"
+                ? "border-rose-500/40 bg-rose-500/10 text-white shadow-md shadow-rose-500/5"
+                : "border-white/5 hover:border-white/15 bg-[#111111]/30 text-gray-400 hover:text-white"
+            }`}
+          >
+            <Info className="w-4 h-4 text-zinc-400" />
+            <span>Apresentação</span>
+          </button>
+
           {/* Explorar tab */}
           <button
             id="btn-nav-explore"
@@ -75,6 +157,22 @@ export function Sidebar({
               </span>
             )}
           </button>
+
+          {/* Admin tab (only shown if user.role === 'admin') */}
+          {user && user.role === "admin" && (
+            <button
+              id="btn-nav-admin"
+              onClick={() => onSelectView("admin")}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                currentView === "admin"
+                  ? "border-rose-500/40 bg-rose-500/10 text-rose-400 shadow-md shadow-rose-500/5"
+                  : "border-white/5 hover:border-white/15 bg-rose-950/10 text-rose-300 hover:text-white"
+              }`}
+            >
+              <Shield className="w-4 h-4 text-rose-500 animate-pulse" />
+              <span className="font-mono text-xs uppercase font-bold tracking-wider">Área Administrativa</span>
+            </button>
+          )}
         </div>
       </div>
 
