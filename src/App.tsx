@@ -41,7 +41,7 @@ export default function App() {
     }
 
     // Trigger an initial automatic exploration search so the dashboard is beautifully populated on load
-    performSearch("lofi chill", "all", false);
+    performSearch("col for the summer hardstyle", "all", false);
   }, []);
 
   // Save history helper
