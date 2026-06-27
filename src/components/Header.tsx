@@ -11,7 +11,7 @@ export function Header() {
         </div>
         <div>
           <h1 className="text-xl font-display font-bold tracking-tight text-white">
-            ZERO<span className="text-[#f43f5e]">TWO</span> <span className="font-light opacity-50">MEDIA HUB</span>
+            ATTO<span className="text-[#f43f5e]"> DOWNLOADS</span>
           </h1>
           <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest hidden sm:block">
             Universal Social Streaming Engine

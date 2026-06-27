@@ -690,18 +690,27 @@ async function streamResponse(apiResponse: any, clientResponse: express.Response
   const contentDisposition = apiResponse.headers.get("content-disposition");
 
   if (contentType) clientResponse.setHeader("content-type", contentType);
-  if (contentLength) clientResponse.setHeader("content-length", contentLength);
+  if (contentLength) {
+    clientResponse.setHeader("content-length", contentLength);
+  } else {
+    clientResponse.setHeader("transfer-encoding", "chunked");
+  }
   if (contentDisposition) clientResponse.setHeader("content-disposition", contentDisposition);
   
-  clientResponse.setHeader("transfer-encoding", "chunked");
   clientResponse.setHeader("access-control-allow-origin", "*");
 
   if (apiResponse.body) {
-    const reader = apiResponse.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      clientResponse.write(value);
+    if (typeof apiResponse.body.getReader === "function") {
+      const reader = apiResponse.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        clientResponse.write(value);
+      }
+    } else {
+      for await (const chunk of apiResponse.body) {
+        clientResponse.write(chunk);
+      }
     }
   }
   clientResponse.end();
@@ -723,16 +732,23 @@ app.get("/api/media/stream-proxy", async (req, res) => {
     const contentLength = response.headers.get("content-length");
     if (contentLength) {
       res.setHeader("content-length", contentLength);
+    } else {
+      res.setHeader("transfer-encoding", "chunked");
     }
-    res.setHeader("transfer-encoding", "chunked");
     res.setHeader("access-control-allow-origin", "*");
 
     if (response.body) {
-      const reader = response.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(value);
+      if (typeof response.body.getReader === "function") {
+        const reader = response.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+      } else {
+        for await (const chunk of response.body as any) {
+          res.write(chunk);
+        }
       }
     }
     res.end();
@@ -759,19 +775,26 @@ app.get("/api/media/download-proxy", async (req, res) => {
     const contentLength = response.headers.get("content-length");
     if (contentLength) {
       res.setHeader("content-length", contentLength);
+    } else {
+      res.setHeader("transfer-encoding", "chunked");
     }
     
     // Set attachment content-disposition to force download
     res.setHeader("content-disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
-    res.setHeader("transfer-encoding", "chunked");
     res.setHeader("access-control-allow-origin", "*");
 
     if (response.body) {
-      const reader = response.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(value);
+      if (typeof response.body.getReader === "function") {
+        const reader = response.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+      } else {
+        for await (const chunk of response.body as any) {
+          res.write(chunk);
+        }
       }
     }
     res.end();

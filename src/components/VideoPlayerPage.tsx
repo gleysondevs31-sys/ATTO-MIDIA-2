@@ -207,6 +207,18 @@ export function VideoPlayerPage({
           : null
     : null;
 
+  const isValidDownloadUrl = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes("url=undefined") || urlLower.includes("url=null") || urlLower.includes("url=&") || urlLower.endsWith("url=")) {
+      return false;
+    }
+    return true;
+  };
+
+  const isAudioValid = isValidDownloadUrl(audioDownloadUrl);
+  const isVideoValid = isValidDownloadUrl(videoDownloadUrl);
+
   // Determine aspect ratio for aesthetic responsiveness
   // TikTok is typically tall/portrait (9:16), YouTube/Instagram Reels vary but we adapt
   const isPortrait = isTikTok || activeMedia?.title?.toLowerCase().includes("shorts") || activeMedia?.originalUrl?.toLowerCase().includes("shorts") || activeMedia?.originalUrl?.toLowerCase().includes("/reel/");
@@ -455,19 +467,25 @@ export function VideoPlayerPage({
                   <p className="text-xs font-semibold text-gray-300 truncate">Converter para Áudio</p>
                   <p className="text-[10px] text-gray-500 font-mono">Formato .MP3</p>
                 </div>
-                {audioDownloadUrl ? (
+                {isAudioValid ? (
                   <a
-                    href={audioDownloadUrl}
+                    href={audioDownloadUrl!}
                     download={`${activeMedia.title} - Audio.mp3`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg transition-all shadow-md shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg transition-all shadow-md shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Baixar</span>
                   </a>
                 ) : (
-                  <span className="text-[10px] text-gray-600 font-mono">Indisponível</span>
+                  <button
+                    disabled
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-500 bg-[#111111] border border-white/5 rounded-lg cursor-not-allowed select-none"
+                  >
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
+                    <span>Aguardando Link...</span>
+                  </button>
                 )}
               </div>
 
@@ -477,19 +495,25 @@ export function VideoPlayerPage({
                   <p className="text-xs font-semibold text-gray-300 truncate">Baixar Vídeo</p>
                   <p className="text-[10px] text-gray-500 font-mono">Formato .MP4</p>
                 </div>
-                {videoDownloadUrl ? (
+                {isVideoValid ? (
                   <a
-                    href={videoDownloadUrl}
+                    href={videoDownloadUrl!}
                     download={`${activeMedia.title} - Video.mp4`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-lg transition-all shadow-md shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-lg transition-all shadow-md shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Baixar</span>
                   </a>
                 ) : (
-                  <span className="text-[10px] text-gray-600 font-mono">Processando...</span>
+                  <button
+                    disabled
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-500 bg-[#111111] border border-white/5 rounded-lg cursor-not-allowed select-none"
+                  >
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
+                    <span>Aguardando Link...</span>
+                  </button>
                 )}
               </div>
             </div>

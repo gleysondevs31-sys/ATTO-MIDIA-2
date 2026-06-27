@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video } from "lucide-react";
+import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2 } from "lucide-react";
 import { NormalizedMedia } from "../types";
 
 interface MediaDetailsModalProps {
@@ -45,6 +45,18 @@ export function MediaDetailsModal({ media, onClose, onPlay }: MediaDetailsModalP
     : isTikTok && media.playableVideoUrl
       ? `/api/media/download-proxy?url=${encodeURIComponent(media.playableVideoUrl)}&filename=${encodeURIComponent(media.title + " - Video.mp4")}`
       : null;
+
+  const isValidDownloadUrl = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes("url=undefined") || urlLower.includes("url=null") || urlLower.includes("url=&") || urlLower.endsWith("url=")) {
+      return false;
+    }
+    return true;
+  };
+
+  const isAudioValid = isValidDownloadUrl(audioDownloadUrl);
+  const isVideoValid = isValidDownloadUrl(videoDownloadUrl);
 
   return (
     <div id="media-details-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
@@ -183,19 +195,25 @@ export function MediaDetailsModal({ media, onClose, onPlay }: MediaDetailsModalP
                       <Play className="w-3.5 h-3.5 fill-white" />
                       <span>Tocar</span>
                     </button>
-                    {audioDownloadUrl ? (
+                    {isAudioValid ? (
                       <a
-                        href={audioDownloadUrl}
+                        href={audioDownloadUrl!}
                         download={`${media.title} - Audio.mp3`}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-sm cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span>Baixar</span>
                       </a>
                     ) : (
-                      <span className="text-[10px] text-gray-600 font-mono px-2 py-1">Indisponível</span>
+                      <button
+                        disabled
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-500 bg-[#111111] border border-white/5 rounded-xl cursor-not-allowed select-none"
+                      >
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
+                        <span>Aguardando Link...</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -222,19 +240,25 @@ export function MediaDetailsModal({ media, onClose, onPlay }: MediaDetailsModalP
                           <Play className="w-3.5 h-3.5 fill-white" />
                           <span>Tocar</span>
                         </button>
-                        {videoDownloadUrl ? (
+                        {isVideoValid ? (
                           <a
-                            href={videoDownloadUrl}
+                            href={videoDownloadUrl!}
                             download={`${media.title} - Video.mp4`}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-xl transition-all shadow-sm cursor-pointer"
                           >
                             <Download className="w-3.5 h-3.5" />
                             <span>Baixar</span>
                           </a>
                         ) : (
-                          <span className="text-[10px] text-gray-600 font-mono px-2 py-1">Carregando...</span>
+                          <button
+                            disabled
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-500 bg-[#111111] border border-white/5 rounded-xl cursor-not-allowed select-none"
+                          >
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
+                            <span>Aguardando Link...</span>
+                          </button>
                         )}
                       </>
                     ) : (
