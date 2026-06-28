@@ -1,17 +1,29 @@
 import React from "react";
-import { Film, Radio, ShieldCheck, LogIn, LogOut, User, Settings, Shield, Menu, X } from "lucide-react";
+import { Film, Radio, ShieldCheck, LogIn, LogOut, User, Settings, Shield, Menu, X, Sun, Moon } from "lucide-react";
 
 interface HeaderProps {
   user: any;
   onOpenAuth: () => void;
   onLogout: () => void;
-  onSelectView: (view: "explore" | "video-player" | "favorites" | "profile" | "admin" | "landing") => void;
+  onSelectView: (view: any) => void;
   currentView: string;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
 }
 
-export function Header({ user, onOpenAuth, onLogout, onSelectView, currentView, isSidebarOpen, onToggleSidebar }: HeaderProps) {
+export function Header({ 
+  user, 
+  onOpenAuth, 
+  onLogout, 
+  onSelectView, 
+  currentView, 
+  isSidebarOpen, 
+  onToggleSidebar,
+  theme,
+  onToggleTheme
+}: HeaderProps) {
   return (
     <header id="app-header" className="sticky top-0 z-40 bg-[#080808]/90 backdrop-blur-md border-b border-white/5 px-6 py-3.5 flex items-center justify-between">
       {/* Brand Logo & Menu Toggle */}
@@ -59,6 +71,16 @@ export function Header({ user, onOpenAuth, onLogout, onSelectView, currentView, 
         </div>
 
         <div className="h-5 w-px bg-white/10 hidden md:block" />
+
+        {/* Theme Switcher */}
+        <button
+          id="btn-header-theme-toggle"
+          onClick={onToggleTheme}
+          title={theme === "light" ? "Mudar para Modo Escuro" : "Mudar para Modo Claro"}
+          className="p-2 rounded-xl border border-white/10 bg-[#111111]/80 text-gray-300 hover:text-white hover:border-white/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-md hover:bg-primary/10 hover:text-primary"
+        >
+          {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </button>
 
         {/* User Account Dropdown/Widget in Header */}
         {user ? (

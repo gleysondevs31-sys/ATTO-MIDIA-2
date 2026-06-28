@@ -1,6 +1,6 @@
 import React from "react";
 import { X, Music, Video, Info, Sparkles, Youtube, Volume2 } from "lucide-react";
-import { NormalizedMedia } from "../types";
+import { NormalizedMedia, formatDuration } from "../types";
 
 interface YoutubeChoiceModalProps {
   media: NormalizedMedia | null;
@@ -48,7 +48,7 @@ export function YoutubeChoiceModal({ media, onClose, onSelectOption }: YoutubeCh
             />
             {media.duration && (
               <span className="absolute bottom-1 right-1 bg-black/85 text-[8px] font-mono text-gray-300 px-1 py-0.5 rounded font-bold">
-                {media.duration}
+                {formatDuration(media.duration)}
               </span>
             )}
           </div>

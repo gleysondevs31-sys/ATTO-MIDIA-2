@@ -21,6 +21,10 @@ import { ProfileView } from "./components/ProfileView";
 import { LandingPage } from "./components/LandingPage";
 import { AdminPanel } from "./components/AdminPanel";
 
+import { LegalView } from "./components/LegalView";
+import { DynamicHelmet } from "./components/DynamicHelmet";
+import { ProviderDownloader } from "./components/ProviderDownloader";
+
 export default function App() {
   const { toast } = useToast();
   const [query, setQuery] = useState("");
@@ -31,7 +35,27 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   
   // Navigation View selection
-  const [currentView, setCurrentView] = useState<"explore" | "video-player" | "favorites" | "profile" | "admin" | "landing">("landing");
+  const [currentView, setCurrentView] = useState<string>("landing");
+  const [legalTab, setLegalTab] = useState<"terms" | "privacy" | "conditions" | "links">("terms");
+
+  // Light/Dark Theme state (White is default)
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem("atto-theme");
+      return saved === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("atto-theme", theme);
+    } catch (e) {
+      console.warn("Could not save theme:", e);
+    }
+  }, [theme]);
 
   // User authentication and database state
   const [user, setUser] = useState<any | null>(null);
@@ -256,10 +280,56 @@ export default function App() {
       });
       if (res.ok) {
         setDbHistory([]);
+        toast.info("Histórico limpo", "Seu histórico de pesquisas foi apagado.");
       }
     } catch (err) {
       console.error("Error clearing search history on Postgres:", err);
     }
+  };
+
+  const handleClearDbFavorites = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/favorites/clear", {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setDbFavorites([]);
+        toast.success("Favoritos limpos", "Todos os seus favoritos foram removidos.");
+      } else {
+        toast.error("Erro", "Não foi possível limpar os favoritos.");
+      }
+    } catch (err) {
+      console.error("Error clearing favorites on Postgres:", err);
+      toast.error("Erro de conexão", "Falha ao conectar com o banco de dados.");
+    }
+  };
+
+  const handleRemoveHistoryItem = async (queryText: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/history/item", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: queryText })
+      });
+      if (res.ok) {
+        setDbHistory(prev => prev.filter(h => h.query !== queryText));
+        toast.info("Histórico atualizado", "Consulta removida com sucesso.");
+      }
+    } catch (err) {
+      console.error("Error removing history item on Postgres:", err);
+    }
+  };
+
+  const handleSearchFromProfile = (q: string) => {
+    setQuery(q);
+    setCurrentView("explore");
+    performSearch(q, selectedPlatform, false);
   };
 
   // Load history & Check session on mount
@@ -470,13 +540,37 @@ export default function App() {
   };
 
   return (
-    <div id="app-root-container" className="min-h-screen flex flex-col bg-dark-bg text-gray-100 font-sans">
+    <div 
+      id="app-root-container" 
+      className={`flex flex-col bg-dark-bg text-gray-100 font-sans ${
+        currentView === "landing" ? "min-h-screen" : "h-screen overflow-hidden"
+      }`}
+    >
+      <DynamicHelmet
+        currentView={currentView}
+        query={query}
+        selectedPlatform={selectedPlatform}
+        activeMedia={activeMedia}
+        selectedDetailsMedia={selectedDetailsMedia}
+      />
       {currentView === "landing" ? (
         <div id="landing-page-root">
           <LandingPage
             onEnterApp={() => setCurrentView("explore")}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             user={user}
+            onSelectLegalView={(tab) => {
+              setLegalTab(tab);
+              setCurrentView("legal");
+            }}
+            onSearch={(q) => {
+              setQuery(q);
+              setCurrentView("explore");
+              const isUrl = q.startsWith("http://") || q.startsWith("https://") || q.includes("youtube.com") || q.includes("youtu.be") || q.includes("spotify.com") || q.includes("soundcloud.com") || q.includes("tiktok.com");
+              performSearch(q, selectedPlatform, isUrl);
+            }}
+            theme={theme}
+            onToggleTheme={() => setTheme(prev => prev === "light" ? "dark" : "light")}
           />
         </div>
       ) : (
@@ -490,10 +584,12 @@ export default function App() {
             currentView={currentView}
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+            theme={theme}
+            onToggleTheme={() => setTheme(prev => prev === "light" ? "dark" : "light")}
           />
 
           {/* Main Responsive Body Area */}
-          <div className="flex-1 flex flex-col lg:flex-row relative">
+          <div className="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
             {/* Navigation Sidebar */}
             <Sidebar
               currentView={currentView}
@@ -510,9 +606,24 @@ export default function App() {
             />
 
             {/* Core Main Viewport */}
-            <main className="flex-1 p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full pb-32">
+            <main className={`flex-1 p-6 md:p-8 space-y-8 mx-auto w-full pb-32 transition-all duration-300 overflow-y-auto h-full ${
+              isSidebarOpen 
+                ? "max-w-7xl" 
+                : "max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1680px]"
+            }`}>
               
-              {currentView === "explore" ? (
+              {currentView.startsWith("downloader-") ? (
+                <ProviderDownloader
+                  provider={currentView.substring("downloader-".length) as any}
+                  onSearch={(q, isUrl) => performSearch(q, currentView.substring("downloader-".length), isUrl)}
+                  isLoading={isLoading}
+                  results={results.filter(item => item.platform === currentView.substring("downloader-".length))}
+                  onPlay={handlePlayMedia}
+                  onSelectDetails={handleSelectDetails}
+                  activeMediaId={activeMedia?.id}
+                  error={error}
+                />
+              ) : currentView === "explore" ? (
             <>
               {/* Welcome Dashboard Banner */}
               <div className="relative overflow-hidden rounded-2xl bg-[#111111]/80 border border-white/5 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
@@ -588,8 +699,18 @@ export default function App() {
               user={user}
               onUpdateProfile={handleUpdateProfile}
               onLogout={handleLogout}
-              favoritesCount={dbFavorites.length}
-              historyCount={dbHistory.length}
+              favorites={dbFavorites}
+              history={dbHistory}
+              token={token}
+              onClearHistory={handleClearDbHistory}
+              onClearFavorites={handleClearDbFavorites}
+              onSearchQuery={handleSearchFromProfile}
+              onRemoveHistoryItem={handleRemoveHistoryItem}
+            />
+          ) : currentView === "legal" ? (
+            <LegalView
+              onBackToExplore={() => setCurrentView("explore")}
+              initialTab={legalTab}
             />
           ) : currentView === "admin" && user && token ? (
             <AdminPanel
@@ -608,6 +729,32 @@ export default function App() {
               isAutoplayEnabled={isAutoplayEnabled}
               onToggleAutoplay={handleToggleAutoplay}
             />
+          )}
+
+          {/* Dynamic Panel Footer */}
+          {currentView !== "landing" && currentView !== "legal" && (
+            <footer className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-zinc-500 font-mono">
+              <div>
+                ATTO Downloads &copy; 2026 &middot; Conexões encriptadas via HTTPS
+              </div>
+              <div className="flex items-center gap-4 flex-wrap text-xs md:text-[11px]">
+                <button onClick={() => { setLegalTab("terms"); setCurrentView("legal"); }} className="hover:text-white transition-colors cursor-pointer">
+                  Termos de Uso
+                </button>
+                <span>&middot;</span>
+                <button onClick={() => { setLegalTab("privacy"); setCurrentView("legal"); }} className="hover:text-white transition-colors cursor-pointer">
+                  Privacidade
+                </button>
+                <span>&middot;</span>
+                <button onClick={() => { setLegalTab("conditions"); setCurrentView("legal"); }} className="hover:text-white transition-colors cursor-pointer">
+                  Condições
+                </button>
+                <span>&middot;</span>
+                <button onClick={() => { setLegalTab("links"); setCurrentView("legal"); }} className="hover:text-white transition-colors cursor-pointer text-primary font-bold">
+                  Links Úteis & FAQ
+                </button>
+              </div>
+            </footer>
           )}
 
         </main>

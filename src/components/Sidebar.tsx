@@ -1,9 +1,9 @@
 import React from "react";
-import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X } from "lucide-react";
+import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram } from "lucide-react";
 
 interface SidebarProps {
-  currentView: "explore" | "video-player" | "favorites" | "profile" | "admin" | "landing";
-  onSelectView: (view: "explore" | "video-player" | "favorites" | "profile" | "admin" | "landing") => void;
+  currentView: string;
+  onSelectView: (view: any) => void;
   hasActiveVideo: boolean;
   user: any;
   selectedPlatform?: string;
@@ -36,7 +36,7 @@ export function Sidebar({
     { id: "tiktok", name: "TikTok", icon: Play, color: "hover:text-sky-400" },
   ];
 
-  const handleSelectNav = (view: "explore" | "video-player" | "favorites" | "profile" | "admin" | "landing") => {
+  const handleSelectNav = (view: string) => {
     onSelectView(view);
     // On mobile, auto-close sidebar after selection
     if (window.innerWidth < 1024) {
@@ -57,10 +57,10 @@ export function Sidebar({
 
       <aside
         id="app-sidebar"
-        className={`fixed lg:static top-0 left-0 h-full lg:h-auto w-72 lg:w-64 bg-[#080808] border-r border-white/5 p-5 flex flex-col gap-6 flex-shrink-0 z-50 transition-all duration-300 shadow-2xl lg:shadow-none ${
+        className={`fixed lg:static top-0 left-0 h-full lg:h-full bg-[#080808] flex-col gap-6 flex-shrink-0 z-50 transition-all duration-300 shadow-2xl lg:shadow-none overflow-y-auto scrollbar-thin ${
           isOpen 
-            ? "translate-x-0 opacity-100" 
-            : "-translate-x-full lg:-translate-x-full lg:w-0 lg:p-0 lg:border-r-0 lg:opacity-0 overflow-hidden pointer-events-none lg:pointer-events-none"
+            ? "w-72 lg:w-64 p-5 translate-x-0 opacity-100 border-r border-white/5 flex" 
+            : "-translate-x-full lg:-translate-x-full w-0 lg:w-0 p-0 lg:p-0 border-r-0 lg:border-r-0 opacity-0 overflow-hidden pointer-events-none lg:pointer-events-none hidden lg:hidden"
         }`}
       >
         {/* Mobile Header Inside Sidebar */}
@@ -161,6 +161,20 @@ export function Sidebar({
               <span>Configurações</span>
             </button>
 
+            {/* Termos e Ajuda */}
+            <button
+              id="btn-nav-legal"
+              onClick={() => handleSelectNav("legal")}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "legal"
+                  ? "border-primary/30 bg-primary/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Shield className="w-4 h-4 text-zinc-400" />
+              <span>Termos & Ajuda</span>
+            </button>
+
             {/* Admin panel */}
             {user && user.role === "admin" && (
               <button
@@ -176,6 +190,79 @@ export function Sidebar({
                 <span>Painel Admin</span>
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Downloaders Group */}
+        <div className="space-y-3 border-t border-white/5 pt-5">
+          <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-500 px-2">
+            Downloaders
+          </h3>
+          <div className="flex flex-col gap-1">
+            <button
+              id="btn-nav-dl-youtube"
+              onClick={() => handleSelectNav("downloader-youtube")}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "downloader-youtube"
+                  ? "border-red-500/30 bg-red-500/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Youtube className="w-4 h-4 text-red-500" />
+              <span>YouTube MP4/MP3</span>
+            </button>
+
+            <button
+              id="btn-nav-dl-tiktok"
+              onClick={() => handleSelectNav("downloader-tiktok")}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "downloader-tiktok"
+                  ? "border-teal-500/30 bg-teal-500/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Play className="w-4 h-4 text-teal-400" />
+              <span>TikTok Downloader</span>
+            </button>
+
+            <button
+              id="btn-nav-dl-instagram"
+              onClick={() => handleSelectNav("downloader-instagram")}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "downloader-instagram"
+                  ? "border-pink-500/30 bg-pink-500/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Instagram className="w-4 h-4 text-pink-500" />
+              <span>Instagram Reels</span>
+            </button>
+
+            <button
+              id="btn-nav-dl-spotify"
+              onClick={() => handleSelectNav("downloader-spotify")}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "downloader-spotify"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Music className="w-4 h-4 text-emerald-500" />
+              <span>Spotify MP3</span>
+            </button>
+
+            <button
+              id="btn-nav-dl-soundcloud"
+              onClick={() => handleSelectNav("downloader-soundcloud")}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "downloader-soundcloud"
+                  ? "border-orange-500/30 bg-orange-500/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Music className="w-4 h-4 text-orange-500" />
+              <span>SoundCloud Audio</span>
+            </button>
           </div>
         </div>
 

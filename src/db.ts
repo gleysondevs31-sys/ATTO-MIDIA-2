@@ -95,12 +95,20 @@ export async function bootstrapDatabase() {
       console.log("[DB] Seeding default platforms into 'platforms_config'...");
       await client.query(`
         INSERT INTO platforms_config (platform_key, name, icon_name, primary_api_url, fallback_api_url) VALUES
-        ('youtube', 'YouTube', 'Youtube', '/api/media/yt-download', 'https://zero-two-apis.com.br/api/dl/multidl'),
+        ('youtube', 'YouTube', 'Youtube', '/api/media/yt-download', 'https://yt-api.zero-two-apis.com.br/api/dl/multidl'),
         ('soundcloud', 'Soundcloud', 'Music', 'https://zero-two-apis.com.br/api/soundcloud/search', 'https://fallback-apis.com/api/soundcloud/search'),
         ('spotify', 'Spotify', 'Music', 'https://zero-two-apis.com.br/api/spotify/search', 'https://fallback-apis.com/api/spotify/search'),
         ('tiktok', 'TikTok', 'Play', 'https://zero-two-apis.com.br/api/download/tiktok/v4', 'https://zero-two-apis.com.br/api/dl/multidl')
       `);
       console.log("[DB] Seeding completed!");
+    } else {
+      // Ensure existing deployments get updated to the new fast/robust YouTube API fallback URL
+      await client.query(`
+        UPDATE platforms_config 
+        SET fallback_api_url = 'https://yt-api.zero-two-apis.com.br/api/dl/multidl' 
+        WHERE platform_key = 'youtube' AND fallback_api_url = 'https://zero-two-apis.com.br/api/dl/multidl'
+      `);
+      console.log("[DB] Existing YouTube config checked and updated if necessary.");
     }
 
     console.log("[DB] Database auto-bootstrap completed successfully!");

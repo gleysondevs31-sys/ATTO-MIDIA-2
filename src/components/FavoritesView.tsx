@@ -111,7 +111,7 @@ export function FavoritesView({
           </p>
         </div>
       ) : (
-        <div id="favorites-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div id="favorites-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
           {filteredFavorites.map((media) => {
             const isPlayingNow = activeMediaId === media.id;
             return (

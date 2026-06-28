@@ -28,3 +28,20 @@ export interface SearchHistoryItem {
   query: string;
   timestamp: number;
 }
+
+export function formatDuration(dur: any): string {
+  if (!dur) return "";
+  if (typeof dur === "string") return dur;
+  if (typeof dur === "object") {
+    if (dur.timestamp) return String(dur.timestamp);
+    if (dur.label) return String(dur.label);
+    if (typeof dur.seconds === "number" || typeof dur.seconds === "string") {
+      const totalSecs = Number(dur.seconds);
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
+    }
+  }
+  return String(dur);
+}
+

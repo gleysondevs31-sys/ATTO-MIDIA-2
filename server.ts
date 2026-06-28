@@ -8,6 +8,7 @@ import tiktok from "@tobyg74/tiktok-api-dl";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool, bootstrapDatabase } from "./src/db.ts";
+import ytSearch from "yt-search";
 
 // Load environment variables
 dotenv.config();
@@ -24,7 +25,8 @@ if (!fs.existsSync(CACHE_DIR)) {
 // Map to coalese active downloads and prevent overlapping requests for the same media url
 const activeDownloads = new Map<string, Promise<{ filePath: string; contentType: string }>>();
 
-async function getOrDownloadMedia(mediaUrl: string, isYtProxy = false): Promise<{ filePath: string; contentType: string }> {
+async function getOrDownloadMedia(rawMediaUrl: string, isYtProxy = false): Promise<{ filePath: string; contentType: string }> {
+  const mediaUrl = cleanUrl(rawMediaUrl);
   const hash = crypto.createHash("sha256").update(mediaUrl).digest("hex");
   const filePath = path.join(CACHE_DIR, hash);
   const metaPath = path.join(CACHE_DIR, `${hash}.json`);
@@ -101,7 +103,8 @@ async function getOrDownloadMedia(mediaUrl: string, isYtProxy = false): Promise<
 
     const stats = fs.statSync(filePath);
     // Sanity check
-    if (stats.size < 20000 && !isYtProxy) {
+    const minRequiredSize = isYtProxy ? 10000 : 20000;
+    if (stats.size < minRequiredSize) {
       try { fs.unlinkSync(filePath); } catch {}
       throw new Error(`Downloaded file is too small (${stats.size} bytes), likely a blocked error page.`);
     }
@@ -123,9 +126,27 @@ async function getOrDownloadMedia(mediaUrl: string, isYtProxy = false): Promise<
   }
 }
 
+function cleanUrl(url: string): string {
+  if (!url || typeof url !== "string") return url;
+  let cleaned = url.trim();
+  if (cleaned.includes("google.com/url?")) {
+    try {
+      const parsed = new URL(cleaned);
+      const q = parsed.searchParams.get("q") || parsed.searchParams.get("url");
+      if (q) {
+        cleaned = q;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  return cleaned;
+}
+
 // Zero Two Configs - Protect API Key strictly using either API_KEY or ZERO_TWO_API_KEY environment variables
 const API_KEY = process.env.API_KEY || process.env.ZERO_TWO_API_KEY || "onnx-ia-key";
-const API_BASE_URL = process.env.ZERO_TWO_API_BASE_URL || "https://zero-two-apis.com.br";
+const API_BASE_URL = cleanUrl(process.env.ZERO_TWO_API_BASE_URL || "https://zero-two-apis.com.br");
+const YT_API_BASE_URL = cleanUrl(process.env.YT_API_BASE_URL || "https://yt-api.zero-two-apis.com.br");
 
 app.use(express.json());
 
@@ -184,6 +205,22 @@ async function getPlatformConfig(platformKey: string) {
   return null;
 }
 
+// Helper function to check if a request involves YouTube platform or a YouTube media URL/query
+function isYoutubeRequest(platformKey: string, endpoint: string, params?: Record<string, string>): boolean {
+  if (platformKey.toLowerCase().trim() === "youtube") return true;
+  if (endpoint.toLowerCase().includes("yt")) return true;
+  if (!params) return false;
+  for (const value of Object.values(params)) {
+    if (typeof value === "string") {
+      const valLower = value.toLowerCase();
+      if (valLower.includes("youtube.com") || valLower.includes("youtu.be") || valLower.includes("youtube") || valLower.includes("ytvideo") || valLower.includes("ytaudio")) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Fetch from a specific platform using its configured primary/fallback URLs and credentials
 async function fetchFromPlatform(platformKey: string, defaultEndpoint: string, params: Record<string, string>) {
   const config = await getPlatformConfig(platformKey);
@@ -197,6 +234,18 @@ async function fetchFromPlatform(platformKey: string, defaultEndpoint: string, p
   let primaryBase = config?.primary_api_url || API_BASE_URL;
   let fallbackBase = config?.fallback_api_url || null;
   const customKey = config?.api_key_override || API_KEY;
+
+  const isYtReq = isYoutubeRequest(platformKey, defaultEndpoint, params);
+
+  // Ensure YouTube platform or YouTube media requests 100% route to the fast robust YouTube API base URL
+  if (isYtReq) {
+    if (primaryBase === API_BASE_URL || primaryBase.startsWith("/")) {
+      primaryBase = YT_API_BASE_URL;
+    }
+    if (!fallbackBase || fallbackBase === API_BASE_URL) {
+      fallbackBase = YT_API_BASE_URL;
+    }
+  }
 
   const runFetch = async (baseUrl: string) => {
     let url: string;
@@ -214,7 +263,8 @@ async function fetchFromPlatform(platformKey: string, defaultEndpoint: string, p
       }
     } else {
       // Relative or local route, e.g. /api/media/yt-download
-      const baseClean = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+      const selectedBase = isYtReq ? YT_API_BASE_URL : API_BASE_URL;
+      const baseClean = selectedBase.endsWith("/") ? selectedBase.slice(0, -1) : selectedBase;
       const pathPart = baseUrl.startsWith("/") ? baseUrl : `/${baseUrl}`;
       url = `${baseClean}${pathPart}?${queryParams}`;
     }
@@ -257,8 +307,12 @@ async function fetchFromPlatform(platformKey: string, defaultEndpoint: string, p
 async function fetchFromZeroTwo(endpoint: string, params: Record<string, string>) {
   const queryParams = new URLSearchParams({ ...params, apikey: API_KEY }).toString();
   
+  // Decide which API base to use (Robust YT API vs Main Zero Two API)
+  const isYoutube = isYoutubeRequest("", endpoint, params);
+  const selectedBase = isYoutube ? YT_API_BASE_URL : API_BASE_URL;
+  
   // Clean slash combination to prevent 404 double slash issues on API gateway
-  const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const base = selectedBase.endsWith("/") ? selectedBase.slice(0, -1) : selectedBase;
   const pathPart = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${base}${pathPart}?${queryParams}`;
   
@@ -298,9 +352,172 @@ function formatMillis(ms: number): string {
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
 
-// Native high-reliability YouTube scraper
-async function searchYouTube(query: string): Promise<any[]> {
+// Fetch YouTube video metadata via the high-speed /info endpoint
+async function fetchYouTubeInfo(rawUrl: string): Promise<any | null> {
+  const url = cleanUrl(rawUrl);
+  const base = YT_API_BASE_URL.endsWith("/") ? YT_API_BASE_URL.slice(0, -1) : YT_API_BASE_URL;
+  const infoUrl = `${base}/info?url=${encodeURIComponent(url)}&apikey=${API_KEY}`;
+  
   try {
+    console.log(`[YouTube Info] Fetching metadata for: ${url}`);
+    const res = await fetch(infoUrl);
+    if (!res.ok) {
+      throw new Error(`YouTube /info API responded with status ${res.status}`);
+    }
+    const data = await res.json();
+    
+    // Support either flat info or a nested "resultado" / "result" structure
+    const info = data.resultado || data.result || data;
+    
+    let videoId = info.id || info.videoId || "";
+    if (!videoId && url.includes("v=")) {
+      videoId = url.split("v=")[1]?.split("&")[0];
+    } else if (!videoId && url.includes("youtu.be/")) {
+      videoId = url.split("youtu.be/")[1]?.split("?")[0];
+    }
+
+    let title = info.title || "YouTube Video";
+    let author = info.author || info.channel || info.channelTitle || info.uploader || "YouTube Creator";
+    if (typeof author === "object" && author.name) author = author.name;
+
+    let thumbnail = info.thumbnail || info.image || "";
+    if (typeof thumbnail === "object" && thumbnail.url) thumbnail = thumbnail.url;
+    if (!thumbnail && Array.isArray(info.thumbnails) && info.thumbnails.length > 0) {
+      thumbnail = typeof info.thumbnails[0] === "string" ? info.thumbnails[0] : info.thumbnails[0].url;
+    }
+    if (!thumbnail && videoId) {
+      thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+
+    const duration = info.duration || info.duration_raw || info.timestamp || info.length || "";
+    const description = info.description || info.shortDescription || info.desc || "";
+
+    return {
+      id: videoId || crypto.createHash("md5").update(url).digest("hex"),
+      title,
+      author,
+      thumbnail: thumbnail || "https://img.freepik.com/premium-vector/youtube-logo_578229-282.jpg",
+      duration,
+      description,
+      originalUrl: url,
+      type: "video" as const,
+      playableVideoUrl: `/api/media/yt-download?type=video&url=${encodeURIComponent(url)}`,
+      playableAudioUrl: `/api/media/yt-download?type=audio&url=${encodeURIComponent(url)}`,
+      embedUrl: videoId ? `https://www.youtube.com/embed/${videoId}` : null,
+      raw: data
+    };
+  } catch (err: any) {
+    console.error("[YouTube Info] Error fetching YouTube info from API:", err.message);
+    return null;
+  }
+}
+
+// YouTube search helper that queries the official high-speed YouTube API first, falling back to a native scraper
+async function searchYouTube(query: string): Promise<any[]> {
+  const base = YT_API_BASE_URL.endsWith("/") ? YT_API_BASE_URL.slice(0, -1) : YT_API_BASE_URL;
+  const searchUrl = `${base}/api/ytsrc/videos?q=${encodeURIComponent(query)}&apikey=${API_KEY}`;
+  
+  try {
+    console.log(`[YouTube Search] Querying API: ${base}/api/ytsrc/videos`);
+    const res = await fetch(searchUrl);
+    if (res.ok) {
+      const data = await res.json();
+      let rawItems: any[] = [];
+      if (Array.isArray(data)) {
+        rawItems = data;
+      } else if (data && Array.isArray(data.resultado)) {
+        rawItems = data.resultado;
+      } else if (data && Array.isArray(data.results)) {
+        rawItems = data.results;
+      } else if (data && Array.isArray(data.data)) {
+        rawItems = data.data;
+      } else if (data && Array.isArray(data.videos)) {
+        rawItems = data.videos;
+      }
+
+      if (rawItems.length > 0) {
+        const mapped = rawItems.map((item: any) => {
+          let id = "";
+          if (typeof item.id === "string") id = item.id;
+          else if (item.videoId && typeof item.videoId === "string") id = item.videoId;
+          else if (item.id && typeof item.id.videoId === "string") id = item.id.videoId;
+          else if (item.id && typeof item.id === "object" && item.id.videoId) id = item.id.videoId;
+
+          let title = item.title || "";
+          let author = item.author || item.channel || item.channelTitle || item.uploader || "YouTube Creator";
+          if (typeof author === "object" && author.name) author = author.name;
+
+          let thumbnail = "";
+          if (typeof item.thumbnail === "string") thumbnail = item.thumbnail;
+          else if (item.thumbnail && typeof item.thumbnail === "object" && item.thumbnail.url) thumbnail = item.thumbnail.url;
+          else if (Array.isArray(item.thumbnails) && item.thumbnails[0]) {
+            thumbnail = typeof item.thumbnails[0] === "string" ? item.thumbnails[0] : item.thumbnails[0].url;
+          } else if (item.image) {
+            thumbnail = item.image;
+          }
+
+          let duration = item.duration || item.duration_raw || item.timestamp || item.length || "";
+          let description = item.description || item.desc || "";
+          let url = item.url || item.link || (id ? `https://www.youtube.com/watch?v=${id}` : "");
+
+          return {
+            id,
+            title,
+            author,
+            thumbnail,
+            duration,
+            description,
+            url
+          };
+        }).filter(item => item.id);
+
+        if (mapped.length > 0) {
+          console.log(`[YouTube Search] Successfully fetched and mapped ${mapped.length} items from Zero Two YT API.`);
+          return mapped;
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error("[YouTube Search] Zero Two YT API search failed, falling back to yt-search package:", error.message);
+  }
+
+  // FALLBACK 1: Official yt-search package
+  try {
+    console.log(`[YouTube Search] Running yt-search package fallback for: "${query}"`);
+    const r = await ytSearch(query);
+    if (r && Array.isArray(r.videos) && r.videos.length > 0) {
+      const mapped = r.videos.map((item: any) => {
+        const id = item.videoId;
+        const title = item.title || "";
+        const author = item.author?.name || "YouTube Creator";
+        const thumbnail = item.thumbnail || item.image || "";
+        const duration = item.timestamp || item.duration?.timestamp || "";
+        const description = item.description || "";
+        const url = item.url || `https://www.youtube.com/watch?v=${id}`;
+
+        return {
+          id,
+          title,
+          author,
+          thumbnail,
+          duration,
+          description,
+          url
+        };
+      }).filter(item => item.id);
+
+      if (mapped.length > 0) {
+        console.log(`[YouTube Search] yt-search package successfully resolved ${mapped.length} items.`);
+        return mapped;
+      }
+    }
+  } catch (error: any) {
+    console.error("[YouTube Search] yt-search package failed:", error.message);
+  }
+
+  // FALLBACK 2: Native high-reliability YouTube scraper
+  try {
+    console.log("[YouTube Search] Running native scraper fallback...");
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
       headers: {
@@ -372,8 +589,10 @@ async function searchTikTokUrls(query: string): Promise<string[]> {
     while ((match = regex.exec(html)) !== null) {
       try {
         const decoded = decodeURIComponent(match[1]);
-        // Filter out tag pages, discover pages, and keep actual video posts
-        if (decoded.includes("tiktok.com/") && !decoded.includes("/tag/") && !decoded.includes("/discover/")) {
+        // Filter out search, tag, discover, and non-video pages, keep actual video posts
+        const lowerDecoded = decoded.toLowerCase();
+        const isValidVideo = lowerDecoded.includes("/video/") || lowerDecoded.includes("/v/") || /vm\.tiktok\.com\/\w+/.test(lowerDecoded);
+        if (decoded.includes("tiktok.com/") && isValidVideo && !lowerDecoded.includes("/search") && !lowerDecoded.includes("/tag/") && !lowerDecoded.includes("/discover/")) {
           urls.push(decoded);
         }
       } catch {}
@@ -432,6 +651,13 @@ async function searchTikTokYahoo(query: string): Promise<string[]> {
 
 // Fetch details for a specific TikTok URL with failover across multiple endpoints
 async function fetchTikTokDetails(url: string): Promise<any | null> {
+  const lowerUrl = url.toLowerCase();
+  const isVideo = lowerUrl.includes("/video/") || lowerUrl.includes("/v/") || lowerUrl.includes("vm.tiktok.com");
+  if (!isVideo) {
+    console.warn(`[TikTok Detail Fetch] Skipping non-video TikTok URL: ${url}`);
+    return null;
+  }
+
   // 1. Try TobyG74 tiktok-api-dl (v3 MusicalDown) first
   try {
     const dlRes = await tiktok.Downloader(url, { version: "v3" });
@@ -891,6 +1117,17 @@ app.get("/api/media/resolve", async (req, res) => {
   }
 
   try {
+    if (platform === "youtube" || url.includes("youtube.com") || url.includes("youtu.be")) {
+      try {
+        const ytDetails = await fetchYouTubeInfo(url);
+        if (ytDetails) {
+          return res.json({ status: true, resolved: ytDetails });
+        }
+      } catch (err: any) {
+        console.warn("fetchYouTubeInfo failed in GET /api/media/resolve, falling back:", err.message);
+      }
+    }
+
     // If it's spotify, resolve using Soundcloud search matching
     if (platform === "spotify" || url.includes("spotify.com")) {
       let searchTitle = url;
@@ -1016,6 +1253,17 @@ app.post("/api/media/by-url", async (req, res) => {
   }
 
   try {
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      try {
+        const ytDetails = await fetchYouTubeInfo(url);
+        if (ytDetails) {
+          return res.json({ status: true, media: ytDetails });
+        }
+      } catch (err: any) {
+        console.warn("fetchYouTubeInfo failed in POST /api/media/by-url, falling back:", err.message);
+      }
+    }
+
     if (url.includes("tiktok.com")) {
       try {
         const ttDetails = await fetchTikTokDetails(url);
@@ -1130,21 +1378,126 @@ app.get("/api/media/resolve-spotify", async (req, res) => {
 });
 
 app.get("/api/media/yt-download", async (req, res) => {
-  const { type, url, srv } = req.query;
+  const { type, url } = req.query;
   if (!url) {
     return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
   }
 
-  const serverIndex = srv ? String(srv) : "1";
-  const endpoint = type === "video" ? `/api/dl/ytvideo${serverIndex === "1" ? "" : serverIndex}` : `/api/dl/ytaudio${serverIndex === "1" ? "" : serverIndex}`;
+  const cleanMediaUrl = cleanUrl(url as string);
+  const base = YT_API_BASE_URL.endsWith("/") ? YT_API_BASE_URL.slice(0, -1) : YT_API_BASE_URL;
   
-  const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  const targetUrl = `${base}${endpoint}?url=${encodeURIComponent(url as string)}&apikey=${API_KEY}`;
-  
-  console.log(`[YouTube Proxy] Fetching or caching from ${type} server ${serverIndex}`);
+  let directMediaUrl: string | null = null;
 
+  // Helper to extract direct URL from nested Zero Two API JSON responses
+  function extractDirectUrl(data: any, mediaType: string): string | null {
+    if (!data) return null;
+    
+    if (mediaType === "video") {
+      const direct = data.resultados?.direct || data.resultados?.url || data.resultado?.direct || data.resultado?.url || data.direct || data.url;
+      if (typeof direct === "string") return direct;
+    } else {
+      // Try nesting for audio first
+      const audioObj = data.resultados?.audio || data.resultado?.audio || data.audio;
+      if (audioObj) {
+        if (typeof audioObj === "string") return audioObj;
+        if (typeof audioObj === "object" && audioObj.url) return audioObj.url;
+      }
+      const direct = data.resultados?.direct || data.resultados?.url || data.resultado?.direct || data.resultado?.url || data.direct || data.url;
+      if (typeof direct === "string") return direct;
+    }
+    
+    return null;
+  }
+
+  // 1. Primary endpoint request based on type
+  const targetUrl = type === "video"
+    ? `${base}/video?url=${encodeURIComponent(cleanMediaUrl)}&quality=best&apikey=${API_KEY}`
+    : `${base}/audio?url=${encodeURIComponent(cleanMediaUrl)}&format=mp3&apikey=${API_KEY}`;
+
+  console.log(`[YouTube Proxy] Querying ${type} endpoint: ${targetUrl.replace(API_KEY, "HIDDEN")}`);
+  
   try {
-    const cacheResult = await getOrDownloadMedia(targetUrl, true);
+    const response = await fetch(targetUrl);
+    if (response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json") || contentType.includes("text/plain")) {
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          directMediaUrl = extractDirectUrl(data, type as string);
+        } catch (e) {
+          console.warn("[YouTube Proxy] Failed to parse primary JSON response.");
+        }
+      } else {
+        directMediaUrl = targetUrl;
+      }
+    }
+  } catch (err: any) {
+    console.error(`[YouTube Proxy] Error querying primary ${type} endpoint:`, err.message);
+  }
+
+  // 2. Secondary fallback request (e.g. /audio/pipe or legacy /dl)
+  if (!directMediaUrl) {
+    const fallbackUrl = type === "video"
+      ? `${base}/dl?url=${encodeURIComponent(cleanMediaUrl)}&type=video&apikey=${API_KEY}`
+      : `${base}/audio/pipe?url=${encodeURIComponent(cleanMediaUrl)}&apikey=${API_KEY}`;
+
+    console.warn(`[YouTube Proxy] Trying fallback endpoint: ${fallbackUrl.replace(API_KEY, "HIDDEN")}`);
+    try {
+      const response = await fetch(fallbackUrl);
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json") || contentType.includes("text/plain")) {
+          const text = await response.text();
+          try {
+            const data = JSON.parse(text);
+            directMediaUrl = extractDirectUrl(data, type as string);
+          } catch (e) {
+            console.warn("[YouTube Proxy] Failed to parse fallback JSON response.");
+          }
+        } else {
+          directMediaUrl = fallbackUrl;
+        }
+      }
+    } catch (err: any) {
+      console.error("[YouTube Proxy] Fallback endpoint failed:", err.message);
+    }
+  }
+
+  // 3. Ultimate legacy /dl fallback if still unresolved
+  if (!directMediaUrl) {
+    const legacyUrl = `${base}/dl?url=${encodeURIComponent(cleanMediaUrl)}&type=${type === "video" ? "video" : "audio"}&apikey=${API_KEY}`;
+    console.warn(`[YouTube Proxy] Trying ultimate legacy fallback: ${legacyUrl.replace(API_KEY, "HIDDEN")}`);
+    try {
+      const response = await fetch(legacyUrl);
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json") || contentType.includes("text/plain")) {
+          const text = await response.text();
+          try {
+            const data = JSON.parse(text);
+            directMediaUrl = extractDirectUrl(data, type as string);
+          } catch (e) {
+            console.warn("[YouTube Proxy] Failed to parse ultimate legacy JSON response.");
+          }
+        } else {
+          directMediaUrl = legacyUrl;
+        }
+      }
+    } catch (err: any) {
+      console.error("[YouTube Proxy] Ultimate legacy fallback failed:", err.message);
+    }
+  }
+
+  if (!directMediaUrl) {
+    return res.status(500).json({ error: "Não foi possível obter uma URL direta de mídia do YouTube.", code: "YT_RESOLVE_FAILED" });
+  }
+
+  console.log(`[YouTube Proxy] Successfully resolved direct media stream URL: ${directMediaUrl}`);
+
+  // 4. Download, cache and send the direct media file, or redirect if it fails
+  try {
+    const cacheResult = await getOrDownloadMedia(directMediaUrl, false);
     
     const ext = type === "video" ? "mp4" : "mp3";
     const filename = `youtube_${type}_${Date.now()}.${ext}`;
@@ -1155,35 +1508,9 @@ app.get("/api/media/yt-download", async (req, res) => {
     
     return res.sendFile(cacheResult.filePath);
   } catch (error: any) {
-    console.warn(`[YouTube Proxy Cache Miss] Failed to cache directly. Trying server fallback stream...`);
-    try {
-      const response = await fetch(targetUrl);
-      
-      if (!response.ok) {
-        console.warn(`[YouTube Proxy] Server ${serverIndex} failed with status ${response.status}. Trying fallback server...`);
-        const fallbackServers = ["1", "2", "3"].filter(s => s !== serverIndex);
-        for (const nextSrv of fallbackServers) {
-          const nextEndpoint = type === "video" ? `/api/dl/ytvideo${nextSrv === "1" ? "" : nextSrv}` : `/api/dl/ytaudio${nextSrv === "1" ? "" : nextSrv}`;
-          const nextUrl = `${base}${nextEndpoint}?url=${encodeURIComponent(url as string)}&apikey=${API_KEY}`;
-          console.log(`[YouTube Proxy Fallback] Trying server ${nextSrv}: ${nextUrl.replace(API_KEY, "HIDDEN")}`);
-          
-          try {
-            const nextResponse = await fetch(nextUrl);
-            if (nextResponse.ok) {
-              return await streamResponse(nextResponse, res);
-            }
-          } catch (err: any) {
-            console.error(`[YouTube Proxy Fallback] Server ${nextSrv} failed:`, err.message);
-          }
-        }
-        return res.status(response.status).json({ error: "Todos os servidores de download do YouTube falharam.", code: "YT_DOWNLOAD_FAILED" });
-      }
-
-      return await streamResponse(response, res);
-    } catch (e: any) {
-      console.error("[YouTube Proxy Error]:", e);
-      res.status(500).json({ error: "Falha ao processar download do YouTube", details: e.message });
-    }
+    console.warn(`[YouTube Proxy Cache Miss/Error] Failed to cache directly: ${error.message}. Redirecting client directly to media URL...`);
+    // Elegant fallback: redirect the client to the direct googlevideo / Catbox URL so their browser handles the streaming directly
+    return res.redirect(directMediaUrl);
   }
 });
 
@@ -1220,7 +1547,7 @@ async function streamResponse(apiResponse: any, clientResponse: express.Response
 }
 
 app.get("/api/media/stream-proxy", async (req, res) => {
-  const mediaUrl = req.query.url as string;
+  const mediaUrl = cleanUrl(req.query.url as string);
   if (!mediaUrl) {
     return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
   }
@@ -1277,7 +1604,7 @@ app.get("/api/media/stream-proxy", async (req, res) => {
 });
 
 app.get("/api/media/download-proxy", async (req, res) => {
-  const mediaUrl = req.query.url as string;
+  const mediaUrl = cleanUrl(req.query.url as string);
   const filename = (req.query.filename as string) || "download.mp3";
   if (!mediaUrl) {
     return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
@@ -1535,6 +1862,53 @@ app.put("/api/auth/profile", authenticateToken, async (req, res) => {
   }
 });
 
+// Change Password Route
+app.post("/api/auth/change-password", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Senha atual e nova senha são obrigatórias" });
+  }
+
+  try {
+    // 1. Get current password hash from db
+    const userRes = await pool.query(
+      "SELECT password FROM users WHERE id = $1",
+      [authReq.user.id]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    const currentHash = userRes.rows[0].password;
+
+    // 2. Compare passwords
+    const isMatch = await bcrypt.compare(currentPassword, currentHash);
+    if (!isMatch) {
+      return res.status(400).json({ error: "A senha atual informada está incorreta" });
+    }
+
+    // 3. Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const newHash = await bcrypt.hash(newPassword, salt);
+
+    // 4. Update password
+    await pool.query(
+      "UPDATE users SET password = $1 WHERE id = $2",
+      [newHash, authReq.user.id]
+    );
+
+    return res.json({ status: true, message: "Senha alterada com sucesso!" });
+  } catch (err: any) {
+    console.error("[Change Password Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao alterar a senha" });
+  }
+});
+
 // Get User Favorites Route
 app.get("/api/favorites", authenticateToken, async (req, res) => {
   const authReq = req as AuthRequest;
@@ -1673,6 +2047,20 @@ app.delete("/api/favorites", authenticateToken, async (req, res) => {
   }
 });
 
+// Clear All Favorites Route
+app.delete("/api/favorites/clear", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    await pool.query("DELETE FROM favorites WHERE user_id = $1", [authReq.user.id]);
+    return res.json({ status: true, message: "Todos os favoritos foram removidos com sucesso!" });
+  } catch (err: any) {
+    console.error("[Clear Favorites Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao limpar favoritos" });
+  }
+});
+
 // Fetch Search History
 app.get("/api/history", authenticateToken, async (req, res) => {
   const authReq = req as AuthRequest;
@@ -1732,6 +2120,29 @@ app.delete("/api/history", authenticateToken, async (req, res) => {
   } catch (err: any) {
     console.error("[Clear History Error]:", err.message);
     return res.status(500).json({ error: "Erro interno ao limpar histórico" });
+  }
+});
+
+// Remove Single Search History Item
+app.delete("/api/history/item", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { query } = req.body;
+
+  if (!query) {
+    return res.status(400).json({ error: "A consulta é obrigatória para exclusão" });
+  }
+
+  try {
+    await pool.query(
+      "DELETE FROM search_history WHERE user_id = $1 AND LOWER(query) = LOWER($2)",
+      [authReq.user.id, query.trim()]
+    );
+    return res.json({ status: true, message: "Item de histórico removido!" });
+  } catch (err: any) {
+    console.error("[Remove History Item Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao remover item de histórico" });
   }
 });
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Play, Info, ExternalLink, Copy, Check, Music, Video } from "lucide-react";
-import { NormalizedMedia } from "../types";
+import { NormalizedMedia, formatDuration } from "../types";
 
 interface MediaCardProps {
   media: NormalizedMedia;
@@ -100,7 +100,7 @@ export function MediaCard({ media, onPlay, onSelectDetails, isActive }: MediaCar
         {/* Duration Badge */}
         {media.duration && (
           <span className="absolute bottom-3 right-3 bg-black/75 border border-white/5 backdrop-blur-sm text-white px-2 py-0.5 rounded text-[10px] font-mono">
-            {media.duration}
+            {formatDuration(media.duration)}
           </span>
         )}
       </div>

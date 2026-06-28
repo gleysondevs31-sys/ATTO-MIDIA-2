@@ -19,7 +19,7 @@ import {
   RefreshCw,
   SkipForward
 } from "lucide-react";
-import { NormalizedMedia } from "../types";
+import { NormalizedMedia, formatDuration } from "../types";
 import { useToast } from "./Toast";
 
 interface VideoPlayerPageProps {
@@ -486,7 +486,7 @@ export function VideoPlayerPage({
                 {activeMedia.duration && (
                   <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-full">
                     <Clock className="w-3 h-3" />
-                    {activeMedia.duration}
+                    {formatDuration(activeMedia.duration)}
                   </span>
                 )}
               </div>
@@ -637,7 +637,7 @@ export function VideoPlayerPage({
                   
                   {item.duration && (
                     <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[8px] font-mono text-gray-300 font-bold">
-                      {item.duration}
+                      {formatDuration(item.duration)}
                     </span>
                   )}
                 </div>

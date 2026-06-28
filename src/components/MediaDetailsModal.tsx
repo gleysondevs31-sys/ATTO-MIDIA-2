@@ -1,6 +1,6 @@
 import React from "react";
 import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2, Heart, Share2 } from "lucide-react";
-import { NormalizedMedia } from "../types";
+import { NormalizedMedia, formatDuration } from "../types";
 import { useToast } from "./Toast";
 
 interface MediaDetailsModalProps {
@@ -180,7 +180,7 @@ export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false,
                     <Clock className="w-3.5 h-3.5" />
                     <span className="text-[10px] font-mono font-bold tracking-wider uppercase">Duração</span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-100">{media.duration}</span>
+                  <span className="text-sm font-semibold text-gray-100">{formatDuration(media.duration)}</span>
                 </div>
               )}
 
