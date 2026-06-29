@@ -17,9 +17,39 @@
   
   --theme-border: #e2e8f0;
   --theme-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+
+  /* Default Primary Colors (Rose) */
+  --color-primary-val: #f43f5e;
+  --color-primary-hover-val: #e11d48;
+  --color-accent-val: #9f1239;
+}
+
+:root[data-accent-theme="violet"] {
+  --color-primary-val: #a855f7;
+  --color-primary-hover-val: #9333ea;
+  --color-accent-val: #7e22ce;
+}
+
+:root[data-accent-theme="emerald"] {
+  --color-primary-val: #10b981;
+  --color-primary-hover-val: #059669;
+  --color-accent-val: #047857;
+}
+
+:root[data-accent-theme="amber"] {
+  --color-primary-val: #f59e0b;
+  --color-primary-hover-val: #d97706;
+  --color-accent-val: #b45309;
+}
+
+:root[data-accent-theme="sky"] {
+  --color-primary-val: #0ea5e9;
+  --color-primary-hover-val: #0284c7;
+  --color-accent-val: #0369a1;
 }
 
 :root[data-theme="dark"] {
+
   /* Sophisticated Dark palette */
   --bg-main: #050505;
   --bg-surface: #080808;
@@ -38,9 +68,9 @@
   --font-display: var(--font-display);
   --font-mono: var(--font-mono);
   
-  --color-primary: #f43f5e;
-  --color-primary-hover: #e11d48;
-  --color-accent: #9f1239;
+  --color-primary: var(--color-primary-val);
+  --color-primary-hover: var(--color-primary-hover-val);
+  --color-accent: var(--color-accent-val);
   
   --color-dark-bg: var(--bg-main);
   --color-dark-surface: var(--bg-surface);
@@ -57,212 +87,93 @@
   }
 }
 
-/* Dynamic Adapter classes to convert Tailwind hardcoded dark utility colors beautifully */
-html[data-theme="light"], :root[data-theme="light"] {
-  /* Main dark/black backgrounds to light grey/slate background */
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
+/* ==========================================================================
+   PRISTINE LIGHT THEME OVERRIDES (CONSOLIDATED & ROBUST)
+   ========================================================================== */
+html[data-theme="light"] {
+  --bg-main: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --theme-border: #cbd5e1;
+  --theme-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
 
-html[data-theme="light"] body {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
+  /* REDEFINE TAILWIND COLOR VARIABLES FOR FLUID THEME ADAPTATION */
+  --color-white: #0f172a;
+  --color-zinc-50: #0f172a;
+  --color-zinc-100: #1e293b;
+  --color-zinc-200: #334155;
+  --color-zinc-300: #475569;
+  --color-zinc-400: #475569;
+  --color-zinc-500: #64748b;
+  --color-zinc-600: #475569;
+
+  --color-gray-50: #0f172a;
+  --color-gray-100: #1e293b;
+  --color-gray-200: #334155;
+  --color-gray-300: #475569;
+  --color-gray-400: #475569;
+  --color-gray-500: #64748b;
+
+  --color-slate-50: #0f172a;
+  --color-slate-100: #1e293b;
+  --color-slate-200: #334155;
+  --color-slate-300: #475569;
+  --color-slate-400: #475569;
+  --color-slate-500: #64748b;
 }
 
 /* Base backgrounds & Containers */
-html[data-theme="light"] .bg-\[\#040404\], 
-html[data-theme="light"] .bg-\[\#050505\], 
-html[data-theme="light"] .bg-\[\#060606\], 
-html[data-theme="light"] .bg-dark-bg, 
-html[data-theme="light"] .bg-neutral-950, 
-html[data-theme="light"] .bg-zinc-950,
+html[data-theme="light"] body,
 html[data-theme="light"] #landing-container,
-html[data-theme="light"] #app-root-container {
+html[data-theme="light"] #app-root-container,
+html[data-theme="light"] .bg-dark-bg {
   background-color: #f8fafc !important;
   background-image: none !important;
+  color: #0f172a !important;
 }
 
-/* Panel surface backgrounds to pure white with soft borders */
-html[data-theme="light"] .bg-\[\#080808\], 
-html[data-theme="light"] .bg-\[\#090909\], 
-html[data-theme="light"] .bg-\[\#0a0a0a\], 
-html[data-theme="light"] .bg-\[\#0c0c0c\], 
-html[data-theme="light"] .bg-\[\#111111\], 
-html[data-theme="light"] .bg-dark-surface, 
-html[data-theme="light"] .bg-dark-card, 
-html[data-theme="light"] .bg-zinc-900, 
-html[data-theme="light"] .bg-zinc-900\/50, 
-html[data-theme="light"] .bg-zinc-900\/60, 
-html[data-theme="light"] .bg-zinc-900\/80, 
-html[data-theme="light"] .bg-zinc-900\/30,
+/* Turn any element with arbitrary dark bg (e.g. bg-[#090909]) into solid white with soft border */
+html[data-theme="light"] [class*="bg-[#"] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Turn any arbitrary translucent white bg (e.g. bg-white/5) into soft grey panel */
+html[data-theme="light"] .bg-white\/5 {
+  background-color: #f1f5f9 !important;
+}
+html[data-theme="light"] .bg-white\/5:hover {
+  background-color: #e2e8f0 !important;
+}
+html[data-theme="light"] .bg-white\/10 {
+  background-color: #e2e8f0 !important;
+}
+html[data-theme="light"] .bg-white\/10:hover {
+  background-color: #cbd5e1 !important;
+}
+
+/* Clean standard borders in light theme */
+html[data-theme="light"] [class*="border-white/"],
+html[data-theme="light"] [class*="border-zinc-"] {
+  border-color: #cbd5e1 !important;
+}
+
+/* Headers, Footers, Aside & Panels */
+html[data-theme="light"] header,
+html[data-theme="light"] footer,
+html[data-theme="light"] aside,
 html[data-theme="light"] #app-header,
 html[data-theme="light"] #sidebar-container,
 html[data-theme="light"] aside#app-sidebar {
   background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
-}
-
-/* Translucent & overlay backgrounds */
-html[data-theme="light"] .bg-\[\#111111\]\/80, 
-html[data-theme="light"] .bg-\[\#111111\]\/60, 
-html[data-theme="light"] .bg-\[\#111111\]\/40, 
-html[data-theme="light"] .bg-\[\#111111\]\/30, 
-html[data-theme="light"] .bg-\[\#111111\]\/20, 
-html[data-theme="light"] .bg-\[\#090909\]\/90, 
-html[data-theme="light"] .bg-\[\#090909\]\/80, 
-html[data-theme="light"] .bg-\[\#090909\]\/60, 
-html[data-theme="light"] .bg-\[\#090909\]\/50, 
-html[data-theme="light"] .bg-\[\#090909\]\/40, 
-html[data-theme="light"] .bg-\[\#0a0a0a\]\/90,
-html[data-theme="light"] .bg-\[\#080808\]\/80 {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* Light theme card hover gradients overrides */
-html[data-theme="light"] .hover\:from-\[\#0c0c0c\]:hover {
-  --tw-gradient-from: #f1f5f9 !important;
-  --tw-gradient-to: #f8fafc !important;
-  background-color: #f1f5f9 !important;
-}
-
-/* Text colors: adapt high contrast dark grey, except for white text inside buttons or badges */
-html[data-theme="light"] .text-white:not(button):not(button *):not(a):not(a *):not(input):not([class*="bg-"]):not([class*="bg-"] *):not(.bg-primary *):not(.from-primary *) {
   color: #0f172a !important;
 }
 
-html[data-theme="light"] .text-zinc-100:not(button *):not([class*="bg-"] *), 
-html[data-theme="light"] .text-zinc-50:not(button *):not([class*="bg-"] *), 
-html[data-theme="light"] .text-gray-100:not(button *):not([class*="bg-"] *), 
-html[data-theme="light"] .text-gray-50:not(button *):not([class*="bg-"] *), 
-html[data-theme="light"] .text-slate-100:not(button *):not([class*="bg-"] *),
-html[data-theme="light"] .text-neutral-100:not(button *):not([class*="bg-"] *) {
-  color: #0f172a !important;
-}
-
-/* Muted grey text adaptation */
-html[data-theme="light"] .text-zinc-400, 
-html[data-theme="light"] .text-gray-400, 
-html[data-theme="light"] .text-zinc-300, 
-html[data-theme="light"] .text-gray-300, 
-html[data-theme="light"] .text-slate-400, 
-html[data-theme="light"] .text-slate-300,
-html[data-theme="light"] .text-neutral-400,
-html[data-theme="light"] .text-neutral-300 {
-  color: #475569 !important;
-}
-
-/* Secondary muted slate text adaptation */
-html[data-theme="light"] .text-zinc-500, 
-html[data-theme="light"] .text-gray-500, 
-html[data-theme="light"] .text-slate-500,
-html[data-theme="light"] .text-neutral-500 {
-  color: #64748b !important;
-}
-
-/* Border overrides to soft light border color */
-html[data-theme="light"] .border-white\/5, 
-html[data-theme="light"] .border-white\/10, 
-html[data-theme="light"] .border-zinc-800, 
-html[data-theme="light"] .border-zinc-700, 
-html[data-theme="light"] .border-white\/20, 
-html[data-theme="light"] .border-white\/30,
-html[data-theme="light"] .border-r {
-  border-color: #e2e8f0 !important;
-}
-
-/* Make sure search input & general inputs stand out in light mode */
-html[data-theme="light"] input,
-html[data-theme="light"] textarea,
-html[data-theme="light"] select {
-  color: #0f172a !important;
-  background-color: #ffffff !important;
-}
-html[data-theme="light"] input::placeholder {
-  color: #94a3b8 !important;
-}
-
-/* Make sure icons inside standard components stand out */
-html[data-theme="light"] .text-zinc-400 svg, 
-html[data-theme="light"] .text-zinc-300 svg {
-  color: #475569 !important;
-}
-
-/* Hover feedback and general items in light theme */
-html[data-theme="light"] .hover\:bg-\[\#111111\]\/40:hover {
-  background-color: #f1f5f9 !important;
-}
-
-/* Active navigation items styled beautifully with high contrast */
-html[data-theme="light"] .bg-primary\/10 {
-  background-color: rgba(244, 63, 94, 0.12) !important;
-  color: #e11d48 !important;
-  border-color: rgba(244, 63, 94, 0.25) !important;
-}
-html[data-theme="light"] .bg-primary\/10 * {
-  color: #e11d48 !important;
-}
-
-/* Dynamic Active Downloader styling */
-html[data-theme="light"] .bg-red-500\/10 {
-  background-color: rgba(239, 68, 68, 0.12) !important;
-  color: #dc2626 !important;
-  border-color: rgba(239, 68, 68, 0.25) !important;
-}
-html[data-theme="light"] .bg-red-500\/10 * {
-  color: #dc2626 !important;
-}
-
-html[data-theme="light"] .bg-teal-500\/10 {
-  background-color: rgba(13, 148, 136, 0.12) !important;
-  color: #0d9488 !important;
-  border-color: rgba(13, 148, 136, 0.25) !important;
-}
-html[data-theme="light"] .bg-teal-500\/10 * {
-  color: #0d9488 !important;
-}
-
-html[data-theme="light"] .bg-pink-500\/10 {
-  background-color: rgba(219, 39, 119, 0.12) !important;
-  color: #db2777 !important;
-  border-color: rgba(219, 39, 119, 0.25) !important;
-}
-html[data-theme="light"] .bg-pink-500\/10 * {
-  color: #db2777 !important;
-}
-
-html[data-theme="light"] .bg-emerald-500\/10 {
-  background-color: rgba(5, 150, 105, 0.12) !important;
-  color: #059669 !important;
-  border-color: rgba(5, 150, 105, 0.25) !important;
-}
-html[data-theme="light"] .bg-emerald-500\/10 * {
-  color: #059669 !important;
-}
-
-html[data-theme="light"] .bg-orange-500\/10 {
-  background-color: rgba(234, 88, 12, 0.12) !important;
-  color: #ea580c !important;
-  border-color: rgba(234, 88, 12, 0.25) !important;
-}
-html[data-theme="light"] .bg-orange-500\/10 * {
-  color: #ea580c !important;
-}
-
-/* Ensure buttons with solid background colors retain white text in light theme */
-html[data-theme="light"] button.bg-primary,
-html[data-theme="light"] button.bg-gradient-to-r,
-html[data-theme="light"] a.bg-primary,
-html[data-theme="light"] a.bg-gradient-to-r,
-html[data-theme="light"] .bg-gradient-to-br.from-red-500 *,
-html[data-theme="light"] .bg-gradient-to-br.from-teal-500 *,
-html[data-theme="light"] .bg-gradient-to-br.from-pink-500 *,
-html[data-theme="light"] .bg-gradient-to-br.from-emerald-500 *,
-html[data-theme="light"] .bg-gradient-to-br.from-orange-500 * {
-  color: #ffffff !important;
-}
-
-/* Modal and card header and text adaptations */
+/* High contrast headings and typography */
 html[data-theme="light"] h1,
 html[data-theme="light"] h2,
 html[data-theme="light"] h3,
@@ -273,34 +184,110 @@ html[data-theme="light"] .font-display {
   color: #0f172a !important;
 }
 
-html[data-theme="light"] .bg-zinc-900\/30 {
-  background-color: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
+/* Make sure buttons with solid background colors retain white text in light theme */
+html[data-theme="light"] .bg-primary,
+html[data-theme="light"] .bg-primary *,
+html[data-theme="light"] .bg-rose-500,
+html[data-theme="light"] .bg-rose-500 *,
+html[data-theme="light"] .bg-rose-600,
+html[data-theme="light"] .bg-rose-600 *,
+html[data-theme="light"] .bg-emerald-500,
+html[data-theme="light"] .bg-emerald-500 *,
+html[data-theme="light"] .bg-emerald-600,
+html[data-theme="light"] .bg-emerald-600 *,
+html[data-theme="light"] .bg-red-500,
+html[data-theme="light"] .bg-red-500 *,
+html[data-theme="light"] .bg-amber-500,
+html[data-theme="light"] .bg-amber-500 *,
+html[data-theme="light"] .bg-gradient-to-r,
+html[data-theme="light"] .bg-gradient-to-r *,
+html[data-theme="light"] .bg-gradient-to-br,
+html[data-theme="light"] .bg-gradient-to-br *,
+html[data-theme="light"] .bg-gradient-to-tr,
+html[data-theme="light"] .bg-gradient-to-tr *,
+html[data-theme="light"] button[class*="bg-primary"],
+html[data-theme="light"] button[class*="bg-gradient-to-"],
+html[data-theme="light"] a[class*="bg-primary"],
+html[data-theme="light"] a[class*="bg-gradient-to-"] {
+  color: #ffffff !important;
 }
 
-html[data-theme="light"] .bg-zinc-900\/50,
-html[data-theme="light"] .bg-[#090909]\/50,
-html[data-theme="light"] .bg-[#090909]\/40 {
-  background-color: #f1f5f9 !important;
-  border-color: #e2e8f0 !important;
+/* Protect gradient and clip text */
+html[data-theme="light"] .bg-clip-text {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
 }
 
-html[data-theme="light"] .bg-zinc-900\/60 {
+/* Soft hover effects */
+html[data-theme="light"] .hover\:bg-white\/5:hover,
+html[data-theme="light"] .hover\:bg-white\/10:hover,
+html[data-theme="light"] .hover\:bg-zinc-800:hover,
+html[data-theme="light"] .hover\:bg-zinc-900:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Form inputs & dropdowns */
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select {
+  color: #0f172a !important;
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
 }
-
-/* Shadow for light cards */
-html[data-theme="light"] .rounded-2xl,
-html[data-theme="light"] .rounded-3xl {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
 }
 
-/* Fix text and icon styles inside specific landing page features */
-html[data-theme="light"] #landing-container * {
-  text-shadow: none !important;
+/* Alerts, Badges and translucent statuses */
+html[data-theme="light"] .bg-primary\/10 {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  color: #e11d48 !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
 }
-
+html[data-theme="light"] .bg-primary\/10 * {
+  color: #e11d48 !important;
+}
+html[data-theme="light"] .bg-rose-500\/10 {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  color: #e11d48 !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
+}
+html[data-theme="light"] .bg-rose-500\/10 * {
+  color: #e11d48 !important;
+}
+html[data-theme="light"] .bg-red-500\/10 {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+  color: #dc2626 !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+html[data-theme="light"] .bg-red-500\/10 * {
+  color: #dc2626 !important;
+}
+html[data-theme="light"] .bg-teal-500\/10 {
+  background-color: rgba(13, 148, 136, 0.12) !important;
+  color: #0d9488 !important;
+  border-color: rgba(13, 148, 136, 0.25) !important;
+}
+html[data-theme="light"] .bg-teal-500\/10 * {
+  color: #0d9488 !important;
+}
+html[data-theme="light"] .bg-emerald-500\/10 {
+  background-color: rgba(5, 150, 105, 0.12) !important;
+  color: #059669 !important;
+  border-color: rgba(5, 150, 105, 0.25) !important;
+}
+html[data-theme="light"] .bg-emerald-500\/10 * {
+  color: #059669 !important;
+}
+html[data-theme="light"] .bg-amber-500\/10 {
+  background-color: rgba(217, 119, 6, 0.12) !important;
+  color: #d97706 !important;
+  border-color: rgba(217, 119, 6, 0.25) !important;
+}
+html[data-theme="light"] .bg-amber-500\/10 * {
+  color: #d97706 !important;
+}
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
@@ -316,4 +303,17 @@ html[data-theme="light"] #landing-container * {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary);
+}
+
+/* Custom animations */
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

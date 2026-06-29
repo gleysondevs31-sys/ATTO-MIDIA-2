@@ -9,9 +9,21 @@ interface MediaPlayerProps {
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
   onPlayNext: () => void;
+  onSelectView?: (view: string) => void;
+  onStateChange?: (state: any) => void;
+  registerControls?: (controls: any) => void;
 }
 
-export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutoplay, onPlayNext }: MediaPlayerProps) {
+export function MediaPlayer({
+  media,
+  onClose,
+  isAutoplayEnabled,
+  onToggleAutoplay,
+  onPlayNext,
+  onSelectView,
+  onStateChange,
+  registerControls
+}: MediaPlayerProps) {
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -36,6 +48,65 @@ export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutopla
   const [selectedQuality, setSelectedQuality] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [isMediaLoading, setIsMediaLoading] = useState(true);
+
+  const activeElement = media?.type === "video" ? videoRef.current : audioRef.current;
+
+  // Sync state changes with the parent App component for the NowPlayingView
+  useEffect(() => {
+    if (onStateChange) {
+      onStateChange({
+        isPlaying,
+        currentTime,
+        duration,
+        volume,
+        isMuted,
+        isMediaLoading
+      });
+    }
+  }, [isPlaying, currentTime, duration, volume, isMuted, isMediaLoading, onStateChange]);
+
+  // Register interactive controls for the NowPlayingView
+  useEffect(() => {
+    if (registerControls) {
+      registerControls({
+        togglePlay: () => {
+          if (!activeElement) return;
+          if (isPlaying) {
+            activeElement.pause();
+            setIsPlaying(false);
+          } else {
+            activeElement.play()
+              .then(() => setIsPlaying(true))
+              .catch(err => console.log("Play failed:", err));
+          }
+        },
+        seek: (time: number) => {
+          if (activeElement) {
+            activeElement.currentTime = time;
+            setCurrentTime(time);
+          }
+        },
+        setVolume: (vol: number) => {
+          setVolume(vol);
+          if (activeElement) {
+            activeElement.volume = vol;
+            activeElement.muted = vol === 0;
+          }
+          setIsMuted(vol === 0);
+        },
+        toggleMute: () => {
+          if (!activeElement) return;
+          const nextMuted = !isMuted;
+          setIsMuted(nextMuted);
+          activeElement.muted = nextMuted;
+          if (!nextMuted && volume === 0) {
+            setVolume(0.5);
+            activeElement.volume = 0.5;
+          }
+        }
+      });
+    }
+  }, [isPlaying, volume, isMuted, mediaUrl, registerControls, activeElement]);
 
   // Set selected quality if media options are available
   useEffect(() => {
@@ -78,8 +149,6 @@ export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutopla
     setIsPlaying(false);
     setCurrentTime(0);
   }, [media, selectedQuality]);
-
-  const activeElement = media?.type === "video" ? videoRef.current : audioRef.current;
 
   // Auto play when source loads
   const handleCanPlay = () => {
@@ -225,12 +294,25 @@ export function MediaPlayer({ media, onClose, isAutoplayEnabled, onToggleAutopla
             )}
           </div>
           
-          <div className="min-w-0 flex-1">
-            <h5 className="font-display font-semibold text-sm text-gray-100 truncate">
-              {media.title}
-            </h5>
+          <div className="min-w-0 flex-1 group/title">
+            <div className="flex items-center gap-1.5 justify-between">
+              <h5 
+                onClick={() => onSelectView && onSelectView("now-playing")}
+                className="font-display font-semibold text-sm text-gray-100 hover:text-primary transition-colors cursor-pointer truncate flex-1"
+                title="Clique para ver letra e detalhes da música"
+              >
+                {media.title}
+              </h5>
+              <button
+                onClick={() => onSelectView && onSelectView("now-playing")}
+                className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/5 transition-all opacity-100 xs:opacity-50 hover:opacity-100 group-hover/title:opacity-100"
+                title="Expandir para tela cheia (Letra & Detalhes)"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <p className="text-xs text-gray-400 truncate font-sans">
-              {media.author}
+              por {media.author}
             </p>
             <span className="text-[10px] font-mono font-semibold text-primary uppercase tracking-wider block mt-0.5">
               {media.platform}

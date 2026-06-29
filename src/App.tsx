@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { SearchBar } from "./components/SearchBar";
@@ -23,7 +23,9 @@ import { AdminPanel } from "./components/AdminPanel";
 
 import { LegalView } from "./components/LegalView";
 import { DynamicHelmet } from "./components/DynamicHelmet";
+import { PlansView } from "./components/PlansView";
 import { ProviderDownloader } from "./components/ProviderDownloader";
+import { NowPlayingView } from "./components/NowPlayingView";
 
 export default function App() {
   const { toast } = useToast();
@@ -37,6 +39,23 @@ export default function App() {
   // Navigation View selection
   const [currentView, setCurrentView] = useState<string>("landing");
   const [legalTab, setLegalTab] = useState<"terms" | "privacy" | "conditions" | "links">("terms");
+
+  // State synchronization for Spotify-style Now Playing view
+  const [sharedPlayerState, setSharedPlayerState] = useState({
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 0.8,
+    isMuted: false,
+    isMediaLoading: false,
+  });
+
+  const playerControlsRef = useRef<{
+    togglePlay: () => void;
+    seek: (time: number) => void;
+    setVolume: (vol: number) => void;
+    toggleMute: () => void;
+  } | null>(null);
 
   // Light/Dark Theme state (White is default)
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -61,7 +80,12 @@ export default function App() {
   const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 1024;
+    }
+    return false;
+  });
   const [dbFavorites, setDbFavorites] = useState<NormalizedMedia[]>([]);
   const [dbHistory, setDbHistory] = useState<SearchHistoryItem[]>([]);
 
@@ -98,6 +122,14 @@ export default function App() {
   useEffect(() => {
     fetchPlatforms();
   }, []);
+
+  // Automatically close sidebar when transitioning to full-width/panel screens, or on mobile for any navigation
+  useEffect(() => {
+    const isPanelScreen = ["admin", "profile", "plans", "legal"].includes(currentView);
+    if (isPanelScreen || window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, [currentView]);
 
   const handleToggleAutoplay = () => {
     setIsAutoplayEnabled(prev => {
@@ -345,10 +377,10 @@ export default function App() {
 
     // Auto login check
     const savedToken = localStorage.getItem("zerotwo_auth_token");
-    if (savedToken) {
-      setToken(savedToken);
+    
+    const fetchUser = (authToken: string) => {
       fetch("/api/auth/profile", {
-        headers: { "Authorization": `Bearer ${savedToken}` }
+        headers: { "Authorization": `Bearer ${authToken}` }
       })
       .then(res => {
         if (res.ok) return res.json();
@@ -357,22 +389,37 @@ export default function App() {
       .then(data => {
         if (data.status && data.user) {
           setUser(data.user);
-          fetchDbFavorites(savedToken);
-          fetchDbHistory(savedToken);
+          fetchDbFavorites(authToken);
+          fetchDbHistory(authToken);
         }
       })
       .catch(err => {
         console.log("Auto-login failed:", err.message);
-        if (savedToken) {
+        if (authToken) {
           toast.warning("Sessão Expirada", "Sua sessão anterior expirou. Por favor, conecte-se novamente.");
         }
         localStorage.removeItem("zerotwo_auth_token");
         setToken(null);
       });
+    };
+
+    if (savedToken) {
+      setToken(savedToken);
+      fetchUser(savedToken);
     }
+
+    const onAuthRefresh = () => {
+      const currentToken = localStorage.getItem("zerotwo_auth_token");
+      if (currentToken) fetchUser(currentToken);
+    };
+    window.addEventListener("force-auth-refresh", onAuthRefresh);
 
     // Trigger an initial automatic exploration search so the dashboard is beautifully populated on load
     performSearch("lofi chill", "all", false);
+    
+    return () => {
+      window.removeEventListener("force-auth-refresh", onAuthRefresh);
+    };
   }, []);
 
   // Save history helper
@@ -490,10 +537,19 @@ export default function App() {
         });
         
         if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Ocorreu um erro ao resolver este link.");
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await res.json();
+            throw new Error(errData.error || "Ocorreu um erro ao resolver este link.");
+          } else {
+            throw new Error("A API principal está em manutenção no momento. Tente buscar na barra em vez de colar links.");
+          }
         }
         
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("A API principal está em manutenção. Não foi possível extrair a mídia.");
+        }
         const data = await res.json();
         if (data.status && data.media) {
           setResults([data.media]);
@@ -508,9 +564,19 @@ export default function App() {
         const res = await fetch(`/api/search?q=${encodedQuery}&platform=${platformId}`);
         
         if (!res.ok) {
-          throw new Error("Não foi possível conectar ao servidor proxy.");
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await res.json();
+            throw new Error(errData.error || "Não foi possível conectar ao servidor.");
+          } else {
+            throw new Error("⚠️ A API principal está em manutenção. Estamos operando com recursos limitados.");
+          }
         }
 
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("⚠️ A API principal está em manutenção. Estamos operando com recursos limitados.");
+        }
         const data = await res.json();
         if (data.status && Array.isArray(data.results)) {
           setResults(data.results);
@@ -571,6 +637,7 @@ export default function App() {
             }}
             theme={theme}
             onToggleTheme={() => setTheme(prev => prev === "light" ? "dark" : "light")}
+            onSelectView={setCurrentView}
           />
         </div>
       ) : (
@@ -707,6 +774,33 @@ export default function App() {
               onSearchQuery={handleSearchFromProfile}
               onRemoveHistoryItem={handleRemoveHistoryItem}
             />
+          ) : currentView === "plans" ? (
+            <PlansView
+              user={user}
+              onUpdateUser={setUser}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onSelectView={setCurrentView}
+            />
+          ) : currentView === "now-playing" ? (
+            <NowPlayingView
+              media={activeMedia}
+              isPlaying={sharedPlayerState.isPlaying}
+              currentTime={sharedPlayerState.currentTime}
+              duration={sharedPlayerState.duration}
+              volume={sharedPlayerState.volume}
+              isMuted={sharedPlayerState.isMuted}
+              onPlayPause={() => playerControlsRef.current?.togglePlay()}
+              onPlayNext={handlePlayNext}
+              onSeek={(t) => playerControlsRef.current?.seek(t)}
+              onVolumeChange={(v) => playerControlsRef.current?.setVolume(v)}
+              onMuteToggle={() => playerControlsRef.current?.toggleMute()}
+              isAutoplayEnabled={isAutoplayEnabled}
+              onToggleAutoplay={handleToggleAutoplay}
+              onBack={() => setCurrentView("explore")}
+              user={user}
+              isFavorited={activeMedia ? dbFavorites.some(f => f.originalUrl === activeMedia.originalUrl) : false}
+              onToggleFavorite={activeMedia ? () => handleToggleFavorite(activeMedia) : () => {}}
+            />
           ) : currentView === "legal" ? (
             <LegalView
               onBackToExplore={() => setCurrentView("explore")}
@@ -770,6 +864,9 @@ export default function App() {
           isAutoplayEnabled={isAutoplayEnabled}
           onToggleAutoplay={handleToggleAutoplay}
           onPlayNext={handlePlayNext}
+          onSelectView={setCurrentView}
+          onStateChange={setSharedPlayerState}
+          registerControls={(ctrls) => { playerControlsRef.current = ctrls; }}
         />
       )}
 
@@ -780,6 +877,8 @@ export default function App() {
         onPlay={handlePlayMedia}
         isFavorited={selectedDetailsMedia ? dbFavorites.some(f => f.originalUrl === selectedDetailsMedia.originalUrl) : false}
         onToggleFavorite={selectedDetailsMedia ? () => handleToggleFavorite(selectedDetailsMedia) : undefined}
+        user={user}
+        onSelectView={setCurrentView}
       />
 
       {/* YouTube Stream Choice Modal Popup */}

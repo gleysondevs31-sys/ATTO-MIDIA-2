@@ -1,5 +1,5 @@
-import React from "react";
-import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2, Heart, Share2 } from "lucide-react";
+import React, { useState } from "react";
+import { X, Play, ExternalLink, Calendar, Music, Clock, User, CheckSquare, Download, Video, Loader2, Heart, Share2, Sparkles, Crown, Zap, ShieldAlert } from "lucide-react";
 import { NormalizedMedia, formatDuration } from "../types";
 import { useToast } from "./Toast";
 
@@ -9,11 +9,56 @@ interface MediaDetailsModalProps {
   onPlay: (media: NormalizedMedia) => void;
   isFavorited?: boolean;
   onToggleFavorite?: () => void;
+  user?: any;
+  onSelectView?: (view: string) => void;
 }
 
-export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false, onToggleFavorite }: MediaDetailsModalProps) {
+export function MediaDetailsModal({ 
+  media, 
+  onClose, 
+  onPlay, 
+  isFavorited = false, 
+  onToggleFavorite,
+  user,
+  onSelectView
+}: MediaDetailsModalProps) {
   if (!media) return null;
   const { toast } = useToast();
+  const [requiredPlanForUpgrade, setRequiredPlanForUpgrade] = useState<"pro" | "premium" | null>(null);
+
+  const handleDownloadClick = (qualityName: string, requiredTier: "free" | "pro" | "premium", downloadUrl: string | null, filename: string) => {
+    if (!downloadUrl) {
+      toast.error("Link indisponível", "Aguardando geração do link de mídia pelo proxy.");
+      return;
+    }
+
+    const currentPlan = user?.plan || "free";
+    
+    // Check authorization
+    if (requiredTier === "pro") {
+      if (currentPlan !== "pro" && currentPlan !== "premium") {
+        setRequiredPlanForUpgrade("pro");
+        return;
+      }
+    } else if (requiredTier === "premium") {
+      if (currentPlan !== "premium") {
+        setRequiredPlanForUpgrade("premium");
+        return;
+      }
+    }
+
+    // If authorized, start download!
+    toast.success("Download iniciado", `Preparando download de '${media.title}' em ${qualityName}...`);
+    
+    // Trigger download
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.target = "_blank";
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleShare = () => {
     if (!media.originalUrl) return;
@@ -61,6 +106,19 @@ export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false,
     : isTikTok && media.playableVideoUrl
       ? `/api/media/download-proxy?url=${encodeURIComponent(media.playableVideoUrl)}&filename=${encodeURIComponent(media.title + " - Video.mp4")}`
       : null;
+
+  const getAudioUrl = (tier: "free" | "pro") => {
+    if (!audioDownloadUrl) return null;
+    return `${audioDownloadUrl}&quality=${tier === "pro" ? "320" : "128"}`;
+  };
+
+  const getVideoUrl = (tier: "free" | "pro" | "premium") => {
+    if (!videoDownloadUrl) return null;
+    let q = "360p";
+    if (tier === "pro") q = "720p";
+    if (tier === "premium") q = "1080p";
+    return `${videoDownloadUrl}&quality=${q}`;
+  };
 
   const isValidDownloadUrl = (url: string | null | undefined): boolean => {
     if (!url) return false;
@@ -213,106 +271,216 @@ export function MediaDetailsModal({ media, onClose, onPlay, isFavorited = false,
               </div>
             )}
 
-            {/* OPÇÕES DE REPRODUÇÃO E DOWNLOAD */}
-            <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">
-                Opções de Play e Download (Áudio & Vídeo)
-              </h4>
-              <div className="space-y-2.5">
-                {/* 1. OPÇÃO ÁUDIO */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#111111]/60 border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-rose-500/10 text-primary border border-rose-500/20 rounded-xl">
-                      <Music className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-semibold text-gray-200">Áudio (MP3 / Música)</h5>
-                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">Ideal para streaming rápido ou fones</p>
-                    </div>
+            {/* OPÇÕES DE REPRODUÇÃO E DOWNLOAD MULTI-QUALIDADE */}
+            <div className="space-y-4 pt-2 relative">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <h4 className="text-xs font-mono font-bold text-gray-400 uppercase tracking-wider">
+                  Opções de Play e Download
+                </h4>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary uppercase">
+                  {user?.plan ? `Plano Ativo: ${user.plan}` : "Plano: Grátis"}
+                </span>
+              </div>
+
+              {/* CONTROLES DE REPRODUÇÃO RÁPIDA */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={playAudio}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-[#111111]/80 hover:bg-white/5 border border-white/5 hover:border-white/10 rounded-2xl text-xs font-semibold text-gray-200 transition-all cursor-pointer"
+                >
+                  <Play className="w-4 h-4 text-rose-500 fill-rose-500 animate-pulse" />
+                  <span>Ouvir Áudio</span>
+                </button>
+                {!isAudioOnly ? (
+                  <button
+                    onClick={playVideo}
+                    className="flex items-center justify-center gap-2 py-2.5 bg-[#111111]/80 hover:bg-white/5 border border-white/5 hover:border-white/10 rounded-2xl text-xs font-semibold text-gray-200 transition-all cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 text-sky-400 fill-sky-400" />
+                    <span>Ver Vídeo</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-center py-2.5 bg-[#111111]/30 border border-dashed border-white/5 rounded-2xl text-[10px] font-mono text-gray-500 select-none">
+                    Apenas Áudio Disponível
                   </div>
-                  
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    <button
-                      onClick={playAudio}
-                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-white" />
-                      <span>Tocar</span>
-                    </button>
+                )}
+              </div>
+
+              {/* SEÇÃO MULTI-QUALIDADE DE ÁUDIO */}
+              <div className="space-y-2">
+                <h5 className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider">Formatos de Áudio</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* ÁUDIO PADRÃO (FREE) */}
+                  <div className="p-3 bg-[#111111]/40 border border-white/5 rounded-2xl flex flex-col justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Music className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="text-xs font-bold text-gray-200">MP3 Standard</span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1">Velocidade padrão • 128 kbps</p>
+                    </div>
                     {isAudioValid ? (
-                      <a
-                        href={audioDownloadUrl!}
-                        download={`${media.title} - Audio.mp3`}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={() => toast.success("Download iniciado", `Preparando o áudio de '${media.title}' via proxy...`)}
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-sm cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Baixar</span>
-                      </a>
-                    ) : (
                       <button
-                        disabled
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-500 bg-[#111111] border border-white/5 rounded-xl cursor-not-allowed select-none"
+                        onClick={() => handleDownloadClick("MP3 Standard (128 kbps)", "free", getAudioUrl("free"), `${media.title} - 128kbps.mp3`)}
+                        className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-white transition-all cursor-pointer"
                       >
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
-                        <span>Aguardando Link...</span>
+                        Baixar Grátis
                       </button>
+                    ) : (
+                      <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Aguardando link...</span>
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* 2. OPÇÃO VÍDEO */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#111111]/60 border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-xl">
-                      <Video className="w-5 h-5" />
-                    </div>
+                  {/* ÁUDIO ULTRA HQ (PRO) */}
+                  <div className="p-3 bg-amber-950/5 border border-amber-500/10 rounded-2xl flex flex-col justify-between gap-3 relative overflow-hidden group">
+                    <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-mono font-bold uppercase rounded bg-amber-500/20 text-amber-400 border border-amber-500/35">
+                      PRO
+                    </span>
                     <div>
-                      <h5 className="text-xs font-semibold text-gray-200">Vídeo (MP4 / Clipe)</h5>
-                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">Assista em alta qualidade com visual original</p>
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-300">MP3 Ultra HQ</span>
+                      </div>
+                      <p className="text-[10px] text-amber-500/60 mt-1">Velocidade 5x • Estúdio 320 kbps</p>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    {!isAudioOnly ? (
-                      <>
-                        <button
-                          onClick={playVideo}
-                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-white" />
-                          <span>Tocar</span>
-                        </button>
-                        {isVideoValid ? (
-                          <a
-                            href={videoDownloadUrl!}
-                            download={`${media.title} - Video.mp4`}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={() => toast.success("Download iniciado", `Preparando o vídeo de '${media.title}' via proxy...`)}
-                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-xl transition-all shadow-sm cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Baixar</span>
-                          </a>
-                        ) : (
-                          <button
-                            disabled
-                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-500 bg-[#111111] border border-white/5 rounded-xl cursor-not-allowed select-none"
-                          >
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
-                            <span>Aguardando Link...</span>
-                          </button>
-                        )}
-                      </>
+                    {isAudioValid ? (
+                      <button
+                        onClick={() => handleDownloadClick("MP3 Ultra HQ (320 kbps)", "pro", getAudioUrl("pro"), `${media.title} - Ultra_320kbps.mp3`)}
+                        className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-amber-300 transition-all cursor-pointer"
+                      >
+                        Baixar HQ
+                      </button>
                     ) : (
-                      <span className="text-[10px] text-gray-500 font-mono italic px-2 py-1 bg-white/5 rounded-lg border border-white/5">Apenas em Áudio</span>
+                      <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Aguardando link...</span>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* SEÇÃO MULTI-QUALIDADE DE VÍDEO */}
+              {!isAudioOnly && (
+                <div className="space-y-2">
+                  <h5 className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider">Resoluções de Vídeo</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* VÍDEO COMPACTO (FREE) */}
+                    <div className="p-3 bg-[#111111]/40 border border-white/5 rounded-2xl flex flex-col justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Video className="w-3.5 h-3.5 text-zinc-400" />
+                          <span className="text-xs font-bold text-gray-200">Vídeo 360p</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Velocidade padrão • MP4 SD</p>
+                      </div>
+                      {isVideoValid ? (
+                        <button
+                          onClick={() => handleDownloadClick("Vídeo SD (360p)", "free", getVideoUrl("free"), `${media.title} - 360p.mp4`)}
+                          className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-white transition-all cursor-pointer"
+                        >
+                          Baixar Grátis
+                        </button>
+                      ) : (
+                        <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Aguardando link...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* VÍDEO HD 720P (PRO) */}
+                    <div className="p-3 bg-amber-950/5 border border-amber-500/10 rounded-2xl flex flex-col justify-between gap-3 relative overflow-hidden group">
+                      <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-mono font-bold uppercase rounded bg-amber-500/20 text-amber-400 border border-amber-500/35">
+                        PRO
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-xs font-bold text-amber-300">HD 720p</span>
+                        </div>
+                        <p className="text-[10px] text-amber-500/60 mt-1">Velocidade 5x • Alta Definição</p>
+                      </div>
+                      {isVideoValid ? (
+                        <button
+                          onClick={() => handleDownloadClick("Vídeo HD (720p)", "pro", getVideoUrl("pro"), `${media.title} - HD_720p.mp4`)}
+                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-amber-300 transition-all cursor-pointer"
+                        >
+                          Baixar HD
+                        </button>
+                      ) : (
+                        <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Aguardando link...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* VÍDEO FULL HD 1080P (PREMIUM) */}
+                    <div className="p-3 bg-rose-950/5 border border-primary/20 rounded-2xl flex flex-col justify-between gap-3 relative overflow-hidden group">
+                      <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-mono font-bold uppercase rounded bg-primary/20 text-primary border border-primary/35">
+                        PREMIUM
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Crown className="w-3.5 h-3.5 text-primary" />
+                          <span className="text-xs font-bold text-rose-300">Full HD 1080p</span>
+                        </div>
+                        <p className="text-[10px] text-rose-500/60 mt-1">Fila Prioritária • Máxima Nitidez</p>
+                      </div>
+                      {isVideoValid ? (
+                        <button
+                          onClick={() => handleDownloadClick("Vídeo Full HD (1080p)", "premium", getVideoUrl("premium"), `${media.title} - Full_HD_1080p.mp4`)}
+                          className="w-full py-2 bg-primary/10 hover:bg-primary/25 border border-primary/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-primary transition-all cursor-pointer"
+                        >
+                          Baixar Ultra
+                        </button>
+                      ) : (
+                        <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Aguardando link...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* OVERLAY EXCLUSIVO DA CONTA PREMIUM */}
+              {requiredPlanForUpgrade && (
+                <div className="absolute inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 rounded-3xl border border-white/10">
+                  <div className="p-4 bg-primary/10 border border-primary/25 rounded-full text-primary">
+                    {requiredPlanForUpgrade === "pro" ? <Zap className="w-8 h-8 animate-pulse text-amber-400" /> : <Crown className="w-8 h-8 animate-bounce text-primary" />}
+                  </div>
+                  <h3 className="text-lg font-bold text-white font-display">Recurso Exclusivo Atto {requiredPlanForUpgrade.toUpperCase()}!</h3>
+                  <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+                    O download em alta qualidade ({requiredPlanForUpgrade === "pro" ? "HD 720p / 320kbps" : "Full HD 1080p / Sem Marca d'água"}) requer uma assinatura ativa.
+                  </p>
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setRequiredPlanForUpgrade(null)}
+                      className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider font-mono bg-[#111111] hover:bg-white/5 border border-white/5 text-gray-400 rounded-xl transition-all cursor-pointer"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRequiredPlanForUpgrade(null);
+                        onClose();
+                        if (onSelectView) onSelectView("plans");
+                      }}
+                      className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider font-mono bg-primary hover:bg-primary-hover text-white rounded-xl shadow-lg shadow-rose-950/20 transition-all cursor-pointer"
+                    >
+                      Assinar Plano
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Platform Original Link */}

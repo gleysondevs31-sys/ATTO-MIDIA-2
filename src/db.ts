@@ -34,8 +34,16 @@ export async function bootstrapDatabase() {
         bio TEXT DEFAULT 'Adoro ouvir música e baixar mídias!',
         role VARCHAR(20) DEFAULT 'user',
         theme VARCHAR(20) DEFAULT 'dark',
+        plan VARCHAR(20) DEFAULT 'free',
+        coins INTEGER DEFAULT 0,
+        plan_expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMP;
     `);
     console.log("[DB] 'users' table verified/created.");
 
@@ -88,6 +96,34 @@ export async function bootstrapDatabase() {
       );
     `);
     console.log("[DB] 'platforms_config' table verified/created.");
+
+    // 5. Create Gift Cards Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gift_cards (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        type VARCHAR(20) NOT NULL, -- 'coins', 'pro', 'ultra', 'premium'
+        value INTEGER, -- amount of coins or duration in days
+        max_uses INTEGER DEFAULT 1,
+        uses INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] 'gift_cards' table verified/created.");
+
+    // 6. Create Gift Card Redemptions Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gift_card_redemptions (
+        id SERIAL PRIMARY KEY,
+        gift_card_id INTEGER NOT NULL REFERENCES gift_cards(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_user_redemption UNIQUE (gift_card_id, user_id)
+      );
+    `);
+    console.log("[DB] 'gift_card_redemptions' table verified/created.");
 
     // Seed default platforms if empty
     const platformsCount = await client.query("SELECT COUNT(*) FROM platforms_config");

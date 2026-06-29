@@ -4,6 +4,7 @@ import {
   Music, ArrowRight, Video, List, Check, Search, Link, Cpu, HelpCircle, 
   TrendingUp, Globe, AlertTriangle, ArrowUpRight, Zap, Sun, Moon
 } from "lucide-react";
+import { AttoLogo } from "./AttoLogo";
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -13,6 +14,7 @@ interface LandingPageProps {
   onSearch: (q: string) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onSelectView?: (view: string) => void;
 }
 
 export function LandingPage({ 
@@ -22,7 +24,8 @@ export function LandingPage({
   onSelectLegalView,
   onSearch,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  onSelectView
 }: LandingPageProps) {
   const [searchValue, setSearchValue] = useState("");
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -97,12 +100,10 @@ export function LandingPage({
       <header className="border-b border-white/5 bg-[#080808]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-rose-700 flex items-center justify-center text-white shadow-md shadow-rose-950/20">
-              <Sparkles className="w-4.5 h-4.5" />
-            </div>
+            <AttoLogo size={36} />
             <div>
               <h1 className="text-sm font-display font-black tracking-wider text-white uppercase flex items-center gap-1">
-                ATTO <span className="text-primary">Downloads</span>
+                ATTO <span className="text-primary font-bold">Downloads</span>
               </h1>
               <p className="text-[9px] font-mono font-bold text-zinc-500 tracking-widest -mt-0.5 uppercase">
                 ZeroTwo Premium Downloader
@@ -111,6 +112,15 @@ export function LandingPage({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Pricing / plans link */}
+            <button
+              onClick={() => onSelectView?.("plans")}
+              className="px-3.5 py-2 text-xs font-mono font-bold text-amber-400 hover:text-amber-300 transition-all cursor-pointer flex items-center gap-1 bg-amber-500/10 rounded-xl border border-amber-500/20 active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>PREÇOS / PRO</span>
+            </button>
+
             {/* Theme Toggle Button */}
             <button
               id="btn-landing-theme-toggle"
@@ -401,6 +411,166 @@ export function LandingPage({
           </div>
         </section>
 
+        {/* LANDING PRICING SECTION */}
+        <section className="max-w-7xl mx-auto px-6 py-12 md:py-20 border-t border-white/5">
+          <div className="text-center space-y-3 mb-16">
+            <span className="text-[10px] font-mono font-bold text-amber-500 uppercase tracking-widest block">
+              TABELA DE PREÇOS
+            </span>
+            <h3 className="text-2xl md:text-3.5xl font-display font-black text-white">
+              Planos Flexíveis Para Suas Necessidades
+            </h3>
+            <p className="text-zinc-500 text-xs md:text-sm max-w-lg mx-auto leading-relaxed">
+              Escolha o plano ideal para você e libere downloads em Full HD, áudio de 320 kbps e remoção completa de marcas d'água do TikTok.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Free Plan */}
+            <div className="p-8 rounded-3xl bg-[#090909]/40 border border-white/5 flex flex-col justify-between relative group overflow-hidden">
+              <div className="space-y-6">
+                <div>
+                  <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-widest block mb-1">PLANO CASUAL</span>
+                  <h4 className="text-xl font-bold text-white font-display">Plano Grátis</h4>
+                  <p className="text-xs text-zinc-500 mt-2 min-h-[32px]">Para downloads básicos casuais do dia a dia.</p>
+                </div>
+                <div className="py-2">
+                  <span className="text-3xl font-display font-black text-white">R$ 0,00</span>
+                  <span className="text-xs text-zinc-500 ml-1">para sempre</span>
+                </div>
+                <ul className="space-y-3 text-xs text-zinc-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span>Downloads de áudio (até 128 kbps)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span>Downloads de vídeo (até 360p)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span>Fila de processamento padrão</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span>Até 10 buscas e downloads por dia</span>
+                  </li>
+                </ul>
+              </div>
+              <button
+                onClick={onEnterApp}
+                className="w-full mt-8 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white text-xs font-bold font-mono tracking-wider transition-all cursor-pointer text-center"
+              >
+                COMEÇAR GRÁTIS
+              </button>
+            </div>
+
+            {/* Atto PRO Plan */}
+            <div className="p-8 rounded-3xl bg-amber-950/5 border border-amber-500/20 flex flex-col justify-between relative group overflow-hidden shadow-lg shadow-amber-950/5">
+              <div className="absolute top-0 right-0 bg-amber-500/20 text-amber-300 border-l border-b border-amber-500/25 px-3 py-1 rounded-bl-xl text-[9px] font-mono font-bold tracking-wider uppercase">
+                Mais Popular
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-widest block mb-1">MÚSICA & HD</span>
+                  <h4 className="text-xl font-bold text-white font-display">Atto PRO</h4>
+                  <p className="text-xs text-zinc-500 mt-2 min-h-[32px]">O melhor custo-benefício para quem ama música e vídeos em HD.</p>
+                </div>
+                <div className="py-2">
+                  <span className="text-3xl font-display font-black text-amber-400">R$ 9,90</span>
+                  <span className="text-xs text-zinc-500 ml-1">/mês</span>
+                </div>
+                <ul className="space-y-3 text-xs text-zinc-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="font-semibold text-zinc-200">Áudio alta fidelidade (320 kbps)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span>Downloads de vídeo HD (720p)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span>Velocidade de download 5x mais rápida</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span>Downloads ilimitados</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span>Acesso total ao SoundCloud & Spotify</span>
+                  </li>
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  if (user) {
+                    onSelectView?.("plans");
+                  } else {
+                    onOpenAuth();
+                  }
+                }}
+                className="w-full mt-8 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold font-mono tracking-wider transition-all cursor-pointer text-center"
+              >
+                ASSINAR PRO
+              </button>
+            </div>
+
+            {/* Atto PREMIUM Plan */}
+            <div className="p-8 rounded-3xl bg-rose-950/5 border border-primary/20 flex flex-col justify-between relative group overflow-hidden shadow-lg shadow-rose-950/5">
+              <div className="absolute top-0 right-0 bg-primary/20 text-primary border-l border-b border-primary/25 px-3 py-1 rounded-bl-xl text-[9px] font-mono font-bold tracking-wider uppercase">
+                Ultra Velocidade
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <span className="text-xs font-mono font-bold text-primary uppercase tracking-widest block mb-1">EXPERIÊNCIA SUPREMA</span>
+                  <h4 className="text-xl font-bold text-white font-display">Atto PREMIUM</h4>
+                  <p className="text-xs text-zinc-500 mt-2 min-h-[32px]">Acesso absoluto, sem limitações e com recursos exclusivos de ponta.</p>
+                </div>
+                <div className="py-2">
+                  <span className="text-3xl font-display font-black text-primary">R$ 19,90</span>
+                  <span className="text-xs text-zinc-500 ml-1">/mês</span>
+                </div>
+                <ul className="space-y-3 text-xs text-zinc-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span className="font-semibold text-zinc-200">Vídeos Full HD 1080p e 4K</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span className="font-semibold text-zinc-200">TikTok Sem Marca d'Água HD</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span>Instagram Reels original</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span>Fila premium com prioridade máxima</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span>Extração de playlists inteiras</span>
+                  </li>
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  if (user) {
+                    onSelectView?.("plans");
+                  } else {
+                    onOpenAuth();
+                  }
+                }}
+                className="w-full mt-8 py-3 rounded-xl bg-primary hover:bg-rose-500 text-white text-xs font-bold font-mono tracking-wider transition-all cursor-pointer text-center"
+              >
+                ASSINAR PREMIUM
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* ACCORDION FAQ SECTION */}
         <section className="max-w-4xl mx-auto px-6 py-12 md:py-20 border-t border-white/5">
           <div className="text-center space-y-3 mb-12">
@@ -453,9 +623,7 @@ export function LandingPage({
             {/* Column 1: Brand & Bio */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-rose-700 flex items-center justify-center text-white font-bold text-xs">
-                  Ω
-                </div>
+                <AttoLogo size={32} />
                 <span className="text-sm font-display font-black tracking-wider text-white uppercase">
                   ATTO <span className="text-primary">Downloads</span>
                 </span>

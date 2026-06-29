@@ -16,6 +16,30 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Prevent server crashes and console pollution from third-party library (tiktok-api-dl)
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('Retry attempt') && args.join(' ').includes('Empty response')) {
+    // Silenced expected tiktok-api-dl timeout/empty response error during maintenance
+    return;
+  }
+  originalConsoleError(...args);
+};
+
+process.on("unhandledRejection", (reason: any, promise) => {
+  if (reason && reason.message && reason.message.includes("Empty response")) {
+    // Silenced expected tiktok-api-dl timeout/empty response error during maintenance
+    return;
+  }
+  // Silenced to prevent console pollution during API maintenance
+  // console.error("[Unhandled Rejection] (Caught to prevent crash):", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  // Silenced to prevent console pollution during API maintenance
+  // console.error("[Uncaught Exception] (Caught to prevent crash):", error);
+});
+
 // Set up local media cache directory
 const CACHE_DIR = path.join(process.cwd(), "atto_cache");
 if (!fs.existsSync(CACHE_DIR)) {
@@ -283,19 +307,32 @@ async function fetchFromPlatform(platformKey: string, defaultEndpoint: string, p
       throw new Error(`A API da plataforma respondeu com status ${response.status}`);
     }
 
-    return await response.json();
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      const text = await response.text();
+      console.warn(`[Dynamic Route] Unexpected content type: ${contentType}. Content: ${text.substring(0, 100)}...`);
+      throw new Error(`Invalid response format from API: Expected JSON but received ${contentType}`);
+    }
   };
 
   try {
     return await runFetch(primaryBase);
   } catch (primaryErr: any) {
-    console.warn(`[Dynamic Route] Primary route failed for '${platformKey}':`, primaryErr.message);
+    if (!primaryErr.message.includes("fetch failed") && !primaryErr.message.includes("Unexpected content type")) {
+      console.warn(`[Dynamic Route] Primary route failed for '${platformKey}':`, primaryErr.message);
+    }
     if (fallbackBase) {
-      console.log(`[Dynamic Route] Falling back for '${platformKey}' to: ${fallbackBase}`);
+      if (!primaryErr.message.includes("fetch failed")) {
+         console.log(`[Dynamic Route] Falling back for '${platformKey}' to: ${fallbackBase}`);
+      }
       try {
         return await runFetch(fallbackBase);
       } catch (fallbackErr: any) {
-        console.error(`[Dynamic Route] Fallback route also failed for '${platformKey}':`, fallbackErr.message);
+        if (!fallbackErr.message.includes("fetch failed") && !fallbackErr.message.includes("Unexpected content type")) {
+          console.error(`[Dynamic Route] Fallback route also failed for '${platformKey}':`, fallbackErr.message);
+        }
         throw fallbackErr;
       }
     }
@@ -336,9 +373,18 @@ async function fetchFromZeroTwo(endpoint: string, params: Record<string, string>
       throw err;
     }
 
-    return await response.json();
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    } else {
+      const text = await response.text();
+      console.warn(`[ZeroTwo Proxy] Unexpected content type: ${contentType}. Content: ${text.substring(0, 100)}...`);
+      throw new Error(`Invalid response format from API: Expected JSON but received ${contentType}`);
+    }
   } catch (error: any) {
-    console.error(`[ZeroTwo Error] Failure calling ${endpoint}:`, error.message);
+    if (!error.message.includes("fetch failed") && !error.message.includes("Unexpected content type")) {
+      console.error(`[ZeroTwo Error] Failure calling ${endpoint}:`, error.message);
+    }
     throw error;
   }
 }
@@ -363,6 +409,11 @@ async function fetchYouTubeInfo(rawUrl: string): Promise<any | null> {
     const res = await fetch(infoUrl);
     if (!res.ok) {
       throw new Error(`YouTube /info API responded with status ${res.status}`);
+    }
+    
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+       throw new Error(`Invalid content type from YouTube info: ${contentType}`);
     }
     const data = await res.json();
     
@@ -412,78 +463,10 @@ async function fetchYouTubeInfo(rawUrl: string): Promise<any | null> {
   }
 }
 
-// YouTube search helper that queries the official high-speed YouTube API first, falling back to a native scraper
+// YouTube search helper that uses yt-search package first to reduce API dependency
 async function searchYouTube(query: string): Promise<any[]> {
-  const base = YT_API_BASE_URL.endsWith("/") ? YT_API_BASE_URL.slice(0, -1) : YT_API_BASE_URL;
-  const searchUrl = `${base}/api/ytsrc/videos?q=${encodeURIComponent(query)}&apikey=${API_KEY}`;
-  
+  // 1. Official yt-search package (Preferred to reduce API dependency)
   try {
-    console.log(`[YouTube Search] Querying API: ${base}/api/ytsrc/videos`);
-    const res = await fetch(searchUrl);
-    if (res.ok) {
-      const data = await res.json();
-      let rawItems: any[] = [];
-      if (Array.isArray(data)) {
-        rawItems = data;
-      } else if (data && Array.isArray(data.resultado)) {
-        rawItems = data.resultado;
-      } else if (data && Array.isArray(data.results)) {
-        rawItems = data.results;
-      } else if (data && Array.isArray(data.data)) {
-        rawItems = data.data;
-      } else if (data && Array.isArray(data.videos)) {
-        rawItems = data.videos;
-      }
-
-      if (rawItems.length > 0) {
-        const mapped = rawItems.map((item: any) => {
-          let id = "";
-          if (typeof item.id === "string") id = item.id;
-          else if (item.videoId && typeof item.videoId === "string") id = item.videoId;
-          else if (item.id && typeof item.id.videoId === "string") id = item.id.videoId;
-          else if (item.id && typeof item.id === "object" && item.id.videoId) id = item.id.videoId;
-
-          let title = item.title || "";
-          let author = item.author || item.channel || item.channelTitle || item.uploader || "YouTube Creator";
-          if (typeof author === "object" && author.name) author = author.name;
-
-          let thumbnail = "";
-          if (typeof item.thumbnail === "string") thumbnail = item.thumbnail;
-          else if (item.thumbnail && typeof item.thumbnail === "object" && item.thumbnail.url) thumbnail = item.thumbnail.url;
-          else if (Array.isArray(item.thumbnails) && item.thumbnails[0]) {
-            thumbnail = typeof item.thumbnails[0] === "string" ? item.thumbnails[0] : item.thumbnails[0].url;
-          } else if (item.image) {
-            thumbnail = item.image;
-          }
-
-          let duration = item.duration || item.duration_raw || item.timestamp || item.length || "";
-          let description = item.description || item.desc || "";
-          let url = item.url || item.link || (id ? `https://www.youtube.com/watch?v=${id}` : "");
-
-          return {
-            id,
-            title,
-            author,
-            thumbnail,
-            duration,
-            description,
-            url
-          };
-        }).filter(item => item.id);
-
-        if (mapped.length > 0) {
-          console.log(`[YouTube Search] Successfully fetched and mapped ${mapped.length} items from Zero Two YT API.`);
-          return mapped;
-        }
-      }
-    }
-  } catch (error: any) {
-    console.error("[YouTube Search] Zero Two YT API search failed, falling back to yt-search package:", error.message);
-  }
-
-  // FALLBACK 1: Official yt-search package
-  try {
-    console.log(`[YouTube Search] Running yt-search package fallback for: "${query}"`);
     const r = await ytSearch(query);
     if (r && Array.isArray(r.videos) && r.videos.length > 0) {
       const mapped = r.videos.map((item: any) => {
@@ -507,17 +490,15 @@ async function searchYouTube(query: string): Promise<any[]> {
       }).filter(item => item.id);
 
       if (mapped.length > 0) {
-        console.log(`[YouTube Search] yt-search package successfully resolved ${mapped.length} items.`);
         return mapped;
       }
     }
   } catch (error: any) {
-    console.error("[YouTube Search] yt-search package failed:", error.message);
+    // Silenced console.error to avoid polluting the console during maintenance
   }
 
-  // FALLBACK 2: Native high-reliability YouTube scraper
+  // 2. Native high-reliability YouTube scraper
   try {
-    console.log("[YouTube Search] Running native scraper fallback...");
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
       headers: {
@@ -549,22 +530,66 @@ async function searchYouTube(query: string): Promise<any[]> {
         const duration = video.lengthText?.simpleText || "";
         const description = video.detailedMetadataSnippets?.[0]?.snippetText?.runs?.map((r: any) => r.text).join("") || "";
         
-        results.push({
-          id: videoId,
-          title,
-          author,
-          thumbnail,
-          duration,
-          description,
-          url: `https://www.youtube.com/watch?v=${videoId}`
-        });
+        if (videoId) {
+          results.push({
+            id: videoId,
+            title,
+            author,
+            thumbnail,
+            duration,
+            description,
+            url: `https://www.youtube.com/watch?v=${videoId}`
+          });
+        }
       }
     }
-    return results;
-  } catch (error) {
-    console.error("YouTube search scraper error:", error);
-    return [];
+    
+    if (results.length > 0) {
+      return results;
+    }
+  } catch (err: any) {
+    // Silenced console.error
   }
+
+  // 3. Fallback to API if all else fails
+  const base = YT_API_BASE_URL.endsWith("/") ? YT_API_BASE_URL.slice(0, -1) : YT_API_BASE_URL;
+  const searchUrl = `${base}/api/ytsrc/videos?q=${encodeURIComponent(query)}&apikey=${API_KEY}`;
+  
+  try {
+    const res = await fetch(searchUrl);
+    if (res.ok) {
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        let rawItems: any[] = [];
+        if (Array.isArray(data)) rawItems = data;
+        else if (data && Array.isArray(data.resultado)) rawItems = data.resultado;
+        else if (data && Array.isArray(data.results)) rawItems = data.results;
+        else if (data && Array.isArray(data.data)) rawItems = data.data;
+        else if (data && Array.isArray(data.videos)) rawItems = data.videos;
+
+        if (rawItems.length > 0) {
+          return rawItems.map((item: any) => {
+            let id = item.id?.videoId || item.videoId || item.id || "";
+            let url = item.url || item.link || (id ? `https://www.youtube.com/watch?v=${id}` : "");
+            return {
+              id,
+              title: item.title || "",
+              author: item.author?.name || item.author || item.channel || "YouTube Creator",
+              thumbnail: item.image || item.thumbnails?.[0]?.url || item.thumbnail || "",
+              duration: item.duration_raw || item.duration || item.timestamp || "",
+              description: item.description || item.desc || "",
+              url
+            };
+          }).filter((item: any) => item.id);
+        }
+      }
+    }
+  } catch (error: any) {
+    // Silenced console.error
+  }
+  
+  return [];
 }
 
 // Helper function to query DuckDuckGo for TikTok URLs based on a query
@@ -573,9 +598,19 @@ async function searchTikTokUrls(query: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Ch-Ua": "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"122\"",
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1"
       }
     });
     if (!res.ok) {
@@ -600,7 +635,9 @@ async function searchTikTokUrls(query: string): Promise<string[]> {
     
     return Array.from(new Set(urls)).slice(0, 10);
   } catch (e: any) {
-    console.error("[searchTikTokUrls error]:", e.message);
+    if (!e.message.includes("status 500") && !e.message.includes("status 503") && !e.message.includes("status 403") && !e.message.includes("status 202")) {
+      console.error("[searchTikTokUrls error]:", e.message);
+    }
     return [];
   }
 }
@@ -611,7 +648,8 @@ async function searchTikTokYahoo(query: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9"
       }
     });
@@ -644,7 +682,9 @@ async function searchTikTokYahoo(query: string): Promise<string[]> {
     
     return Array.from(new Set(urls)).slice(0, 10);
   } catch (e: any) {
-    console.error("[searchTikTokYahoo error]:", e.message);
+    if (!e.message.includes("status 500") && !e.message.includes("status 503")) {
+      console.error("[searchTikTokYahoo error]:", e.message);
+    }
     return [];
   }
 }
@@ -696,69 +736,7 @@ async function fetchTikTokDetails(url: string): Promise<any | null> {
     console.warn(`[TikTok Detail Fetch] TobyG74 v2 failed for ${url}:`, err.message);
   }
 
-  // Fallbacks: ZeroTwo API endpoints if TobyG74 fails
-  // 3. Try v3
-  try {
-    const data = await fetchFromZeroTwo("/api/download/tiktok/v3", { url });
-    if (data && data.status && data.resultado) {
-      const item = data.resultado;
-      return {
-        title: item.desc || "TikTok Video",
-        author: item.author?.nickname || item.author?.name || "TikTok User",
-        thumbnail: item.author?.avatar || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
-        playableVideoUrl: item.videoHD || item.videoSD || item.videoWatermark || null,
-        playableAudioUrl: item.music || null,
-        originalUrl: url,
-        raw: item
-      };
-    }
-  } catch (err: any) {
-    console.warn(`[TikTok Detail Fetch] v3 failed for ${url}:`, err.message);
-  }
-
-  // 4. Fallback to multidl - standard robust fallback
-  try {
-    const data = await fetchFromZeroTwo("/api/dl/multidl", { url });
-    if (data && data.resultado) {
-      const item = data.resultado;
-      const medias = item.medias || [];
-      const videoUrl = medias.find((m: any) => m.type === "video" && m.quality === "no_watermark")?.url || 
-                       medias.find((m: any) => m.type === "video")?.url;
-      const audioUrl = medias.find((m: any) => m.type === "audio")?.url;
-
-      return {
-        title: item.title || "TikTok Video",
-        author: item.author || item.unique_id || "TikTok User",
-        thumbnail: item.thumbnail || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
-        playableVideoUrl: videoUrl || null,
-        playableAudioUrl: audioUrl || null,
-        originalUrl: url,
-        raw: item
-      };
-    }
-  } catch (err: any) {
-    console.warn(`[TikTok Detail Fetch] multidl failed for ${url}:`, err.message);
-  }
-
-  // 5. Fallback to v4
-  try {
-    const data = await fetchFromZeroTwo("/api/download/tiktok/v4", { url });
-    if (data && data.status && data.resultado) {
-      const item = data.resultado;
-      return {
-        title: item.detalhes?.desc || "TikTok Video",
-        author: item.detalhes?.author?.nickname || "TikTok User",
-        thumbnail: item.detalhes?.author?.avatar || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
-        playableVideoUrl: item.video?.playAddr?.[0] || null,
-        playableAudioUrl: item.audio?.playUrl?.[0] || null,
-        originalUrl: url,
-        raw: item
-      };
-    }
-  } catch (err: any) {
-    console.warn(`[TikTok Detail Fetch] v4 failed for ${url}:`, err.message);
-  }
-
+  // No fallbacks to Zero Two for TikTok anymore
   return null;
 }
 
@@ -828,7 +806,9 @@ app.get("/api/search", async (req, res) => {
           );
         }
       } catch (err: any) {
-        console.error("Error searching Soundcloud:", err.message);
+        if (!err.message.includes("fetch failed") && !err.message.includes("Unexpected content type")) {
+          console.error("Error searching Soundcloud:", err.message);
+        }
       }
     }
 
@@ -855,7 +835,9 @@ app.get("/api/search", async (req, res) => {
           );
         }
       } catch (err: any) {
-        console.error("Error searching Spotify:", err.message);
+        if (!err.message.includes("fetch failed") && !err.message.includes("Unexpected content type")) {
+          console.error("Error searching Spotify:", err.message);
+        }
       }
     }
 
@@ -916,31 +898,32 @@ app.get("/api/search", async (req, res) => {
           ].filter((v, idx, self) => self.indexOf(v) === idx && v.length > 0);
           
           const promises = variations.map(v => 
-            fetchFromPlatform("tiktok", "/download/tiktoksearch", { username: v }).catch(() => null)
+            tiktok.GetUserPosts(v, { postLimit: 5 }).catch(() => null)
           );
           
           const responses = await Promise.all(promises);
           for (const ttData of responses) {
-            if (ttData && ttData.status && ttData.resultado) {
-              const item = ttData.resultado;
-              const videoId = item.no_watermark || item.watermark || item.title || item.cover;
-              if (!videoId || seenVideos.has(videoId)) continue;
-              seenVideos.add(videoId);
-              
-              results.push({
-                id: `tt-${item.author || Math.random().toString()}-${item.cover?.split("/").pop() || Math.random().toString()}`,
-                platform: "tiktok",
-                title: item.title || "TikTok Video",
-                author: item.author || "TikTok User",
-                thumbnail: item.cover || item.origin_cover || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
-                duration: "",
-                description: item.title || "TikTok Post",
-                originalUrl: item.author ? `https://www.tiktok.com/@${item.author.replace("@", "")}` : "https://www.tiktok.com",
-                playableAudioUrl: item.music || null,
-                playableVideoUrl: item.no_watermark || item.watermark || null,
-                type: "video" as const,
-                raw: item
-              });
+            if (ttData && ttData.status === "success" && ttData.result) {
+              for (const item of ttData.result) {
+                const videoId = item.id;
+                if (!videoId || seenVideos.has(videoId)) continue;
+                seenVideos.add(videoId);
+                
+                results.push({
+                  id: `tt-${item.author?.username || Math.random().toString()}-${item.id || Math.random().toString()}`,
+                  platform: "tiktok",
+                  title: item.desc || "TikTok Video",
+                  author: item.author?.nickname || item.author?.username || "TikTok User",
+                  thumbnail: item.video?.cover || item.video?.originCover || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+                  duration: "",
+                  description: item.desc || "TikTok Post",
+                  originalUrl: item.author?.username ? `https://www.tiktok.com/@${item.author.username}/video/${item.id}` : "https://www.tiktok.com",
+                  playableAudioUrl: item.music?.playUrl || null,
+                  playableVideoUrl: item.video?.playAddr || item.video?.downloadAddr || null,
+                  type: "video" as const,
+                  raw: item
+                });
+              }
             }
           }
         }
@@ -1027,20 +1010,20 @@ app.get("/api/media/details", async (req, res) => {
       }
     } else if (platform === "tiktok") {
       try {
-        const ttData = await fetchFromPlatform("tiktok", "/download/tiktoksearch", { username: id });
-        if (ttData && ttData.status && ttData.resultado) {
-          const item = ttData.resultado;
+        const ttData = await tiktok.GetUserPosts(id, { postLimit: 1 });
+        if (ttData && ttData.status === "success" && ttData.result && ttData.result.length > 0) {
+          const item = ttData.result[0];
           details = {
             id: `tt-${id}`,
             platform: "tiktok",
-            title: item.title || "TikTok Video",
-            author: item.author || "TikTok User",
-            thumbnail: item.cover || item.origin_cover || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
+            title: item.desc || "TikTok Video",
+            author: item.author?.nickname || item.author?.username || "TikTok User",
+            thumbnail: item.video?.cover || item.video?.originCover || "https://img.freepik.com/premium-vector/tik-tok-logo_578229-290.jpg",
             duration: "",
-            description: item.title || "TikTok Post",
-            originalUrl: item.author ? `https://www.tiktok.com/@${item.author.replace("@", "")}` : "https://www.tiktok.com",
-            playableAudioUrl: item.music || null,
-            playableVideoUrl: item.no_watermark || item.watermark || null,
+            description: item.desc || "TikTok Post",
+            originalUrl: item.author?.username ? `https://www.tiktok.com/@${item.author.username}/video/${item.id}` : "https://www.tiktok.com",
+            playableAudioUrl: item.music?.playUrl || null,
+            playableVideoUrl: item.video?.playAddr || item.video?.downloadAddr || null,
             type: "video",
             raw: item
           };
@@ -1186,6 +1169,11 @@ app.get("/api/media/resolve", async (req, res) => {
       } catch (err: any) {
         console.warn("fetchTikTokDetails failed in GET /api/media/resolve, falling back:", err.message);
       }
+      return res.status(404).json({
+        status: false,
+        error: "Não foi possível resolver a URL do TikTok.",
+        code: "RESOLVE_FAILED"
+      });
     }
 
     // Standard URL Multi-downloader parser
@@ -1287,6 +1275,11 @@ app.post("/api/media/by-url", async (req, res) => {
       } catch (err: any) {
         console.warn("fetchTikTokDetails failed in POST /api/media/by-url, falling back:", err.message);
       }
+      return res.status(404).json({
+        status: false,
+        error: "Nenhuma mídia encontrada para a URL do TikTok.",
+        code: "URL_NOT_RESOLVED"
+      });
     }
 
     const rawData = await fetchFromZeroTwo("/api/dl/multidl", { url });
@@ -1731,7 +1724,7 @@ app.post("/api/auth/register", async (req, res) => {
     const insertRes = await pool.query(
       `INSERT INTO users (username, email, password, role) 
        VALUES ($1, $2, $3, $4) 
-       RETURNING id, username, email, avatar, bio, role, theme, created_at`,
+       RETURNING id, username, email, avatar, bio, role, theme, plan, created_at`,
       [username.trim(), email.trim().toLowerCase(), hashedPassword, roleToAssign]
     );
 
@@ -1800,7 +1793,7 @@ app.get("/api/auth/profile", authenticateToken, async (req, res) => {
 
   try {
     const userRes = await pool.query(
-      "SELECT id, username, email, avatar, bio, role, theme, created_at FROM users WHERE id = $1",
+      "SELECT id, username, email, avatar, bio, role, theme, plan, coins, plan_expires_at, created_at FROM users WHERE id = $1",
       [authReq.user.id]
     );
 
@@ -1841,7 +1834,7 @@ app.put("/api/auth/profile", authenticateToken, async (req, res) => {
            bio = COALESCE($3, bio), 
            theme = COALESCE($4, theme) 
        WHERE id = $5 
-       RETURNING id, username, email, avatar, bio, role, theme, created_at`,
+       RETURNING id, username, email, avatar, bio, role, theme, plan, coins, plan_expires_at, created_at`,
       [
         username ? username.trim() : null,
         avatar ? avatar.trim() : null,
@@ -1859,6 +1852,41 @@ app.put("/api/auth/profile", authenticateToken, async (req, res) => {
   } catch (err: any) {
     console.error("[Update Profile Error]:", err.message);
     return res.status(500).json({ error: "Erro ao atualizar dados do perfil" });
+  }
+});
+
+// Upgrade User Plan Route (Mock Payment Success Handler)
+app.post("/api/auth/upgrade", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { plan } = req.body;
+  if (!plan || !["free", "pro", "premium"].includes(plan)) {
+    return res.status(400).json({ error: "Plano inválido ou não especificado" });
+  }
+
+  try {
+    const updateRes = await pool.query(
+      `UPDATE users 
+       SET plan = $1 
+       WHERE id = $2 
+       RETURNING id, username, email, avatar, bio, role, theme, plan, created_at`,
+      [plan, authReq.user.id]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    console.log(`[Billing System] User ${authReq.user.username} successfully upgraded to ${plan.toUpperCase()}`);
+    return res.json({ 
+      status: true, 
+      message: `Upgrade para o plano ${plan.toUpperCase()} realizado com sucesso!`, 
+      user: updateRes.rows[0] 
+    });
+  } catch (err: any) {
+    console.error("[Upgrade Plan Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao processar upgrade de plano", details: err.message });
   }
 });
 
@@ -2143,6 +2171,111 @@ app.delete("/api/history/item", authenticateToken, async (req, res) => {
   } catch (err: any) {
     console.error("[Remove History Item Error]:", err.message);
     return res.status(500).json({ error: "Erro interno ao remover item de histórico" });
+  }
+});
+
+// ==========================================
+// GIFT CARDS SYSTEM
+// ==========================================
+
+// User redeem gift card
+app.post("/api/gift-cards/redeem", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  const { code } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ error: "O código do Gift Card é obrigatório." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Find active gift card
+    const cardRes = await client.query(
+      "SELECT * FROM gift_cards WHERE code = $1 AND is_active = true FOR UPDATE",
+      [code]
+    );
+
+    if (cardRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Gift Card inválido ou expirado." });
+    }
+
+    const card = cardRes.rows[0];
+
+    if (card.uses >= card.max_uses) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "O limite de usos para este Gift Card já foi atingido." });
+    }
+
+    // Check if user already redeemed this card
+    const checkRedeemed = await client.query(
+      "SELECT id FROM gift_card_redemptions WHERE gift_card_id = $1 AND user_id = $2",
+      [card.id, authReq.user.id]
+    );
+
+    if (checkRedeemed.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "Você já resgatou este Gift Card." });
+    }
+
+    // Process redemption
+    if (card.type === 'coins') {
+      await client.query(
+        "UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2",
+        [card.value, authReq.user.id]
+      );
+    } else {
+      // It's a plan (pro, premium, ultra)
+      const durationDays = card.value || 30; // Default 30 days if not specified
+      await client.query(
+        `UPDATE users 
+         SET plan = $1, 
+             plan_expires_at = CURRENT_TIMESTAMP + INTERVAL '${durationDays} days'
+         WHERE id = $2`,
+        [card.type, authReq.user.id]
+      );
+    }
+
+    // Update uses
+    const newUses = card.uses + 1;
+    const isActive = newUses < card.max_uses;
+    await client.query(
+      "UPDATE gift_cards SET uses = $1, is_active = $2 WHERE id = $3",
+      [newUses, isActive, card.id]
+    );
+
+    // Insert redemption record
+    await client.query(
+      "INSERT INTO gift_card_redemptions (gift_card_id, user_id) VALUES ($1, $2)",
+      [card.id, authReq.user.id]
+    );
+
+    await client.query('COMMIT');
+
+    const message = card.type === 'coins' 
+      ? `Você resgatou ${card.value} coins!` 
+      : `Você resgatou ${card.value} dias do plano ${card.type.toUpperCase()}!`;
+
+    // Return updated user data
+    const updatedUserRes = await client.query(
+      "SELECT id, username, email, avatar, bio, role, theme, plan, coins, plan_expires_at FROM users WHERE id = $1",
+      [authReq.user.id]
+    );
+
+    return res.json({ 
+      status: true, 
+      message,
+      user: updatedUserRes.rows[0]
+    });
+
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error("[Redeem Gift Card Error]:", err.message);
+    return res.status(500).json({ error: "Erro interno ao resgatar Gift Card." });
+  } finally {
+    client.release();
   }
 });
 
@@ -2445,6 +2578,67 @@ app.delete("/api/admin/platforms/:id", authenticateToken, requireAdmin, async (r
   } catch (err: any) {
     console.error("[Admin Delete Platform Error]:", err.message);
     return res.status(500).json({ error: "Erro interno ao excluir plataforma." });
+  }
+});
+
+// ==========================================
+// ADMIN GIFT CARDS MANAGEMENT
+// ==========================================
+
+app.get("/api/admin/gift-cards", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT g.*, u.username as created_by_username
+       FROM gift_cards g
+       LEFT JOIN users u ON g.created_by = u.id
+       ORDER BY g.created_at DESC`
+    );
+    return res.json({ status: true, giftCards: result.rows });
+  } catch (err: any) {
+    console.error("[Admin Get Gift Cards Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao buscar gift cards." });
+  }
+});
+
+app.post("/api/admin/gift-cards", authenticateToken, requireAdmin, async (req, res) => {
+  const authReq = req as AuthRequest;
+  const { code, type, value, max_uses } = req.body;
+
+  if (!code || !type || !value || !max_uses) {
+    return res.status(400).json({ error: "Todos os campos (code, type, value, max_uses) são obrigatórios." });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO gift_cards (code, type, value, max_uses, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [code, type, value, max_uses, authReq.user.id]
+    );
+    return res.json({ status: true, giftCard: result.rows[0], message: "Gift Card criado com sucesso!" });
+  } catch (err: any) {
+    console.error("[Admin Create Gift Card Error]:", err.message);
+    if (err.code === '23505') {
+      return res.status(400).json({ error: "Já existe um Gift Card com este código." });
+    }
+    return res.status(500).json({ error: "Erro ao criar gift card." });
+  }
+});
+
+app.delete("/api/admin/gift-cards/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "DELETE FROM gift_cards WHERE id = $1 RETURNING id",
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Gift Card não encontrado." });
+    }
+    return res.json({ status: true, message: "Gift Card removido com sucesso." });
+  } catch (err: any) {
+    console.error("[Admin Delete Gift Card Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao remover gift card." });
   }
 });
 

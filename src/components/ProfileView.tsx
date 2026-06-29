@@ -42,7 +42,7 @@ export function ProfileView({
   onSearchQuery,
   onRemoveHistoryItem,
 }: ProfileViewProps) {
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "achievements" | "history">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "security" | "achievements" | "history" | "giftcards">("profile");
   
   // Profile Form States
   const [username, setUsername] = useState(user.username);
@@ -60,6 +60,11 @@ export function ProfileView({
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+  // Gift Card States
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [isRedeemingCard, setIsRedeemingCard] = useState(false);
+  const [giftCardMessage, setGiftCardMessage] = useState<{type: "error" | "success", text: string} | null>(null);
 
   // Danger Zone confirmation states
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
@@ -171,6 +176,43 @@ export function ProfileView({
       setPasswordError(err.message || "Erro ao conectar com o servidor.");
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  // Handle gift card redemption
+  const handleRedeemGiftCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGiftCardMessage(null);
+    if (!giftCardCode.trim()) return;
+    
+    setIsRedeemingCard(true);
+    try {
+      const response = await fetch("/api/gift-cards/redeem", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: giftCardCode.trim() })
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.status) {
+        setGiftCardMessage({ type: "success", text: data.message });
+        setGiftCardCode("");
+        // Fire event or use a callback to re-fetch the user details
+        if (data.user) {
+          // A trick to update local user view without full reload if onUpdateProfile allows it
+          // Or just dispatch a window event to trigger re-auth in App.tsx
+          window.dispatchEvent(new Event("force-auth-refresh"));
+        }
+      } else {
+        throw new Error(data.error || "Erro ao resgatar o código.");
+      }
+    } catch (err: any) {
+      setGiftCardMessage({ type: "error", text: err.message });
+    } finally {
+      setIsRedeemingCard(false);
     }
   };
 
@@ -393,6 +435,17 @@ export function ProfileView({
         >
           <Search className="w-4 h-4" />
           <span>Histórico Detalhado ({historyCount})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("giftcards")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            activeTab === "giftcards"
+              ? "bg-primary text-white shadow-lg"
+              : "bg-[#111111]/40 text-zinc-400 hover:text-white border border-white/5 hover:bg-[#111111]"
+          }`}
+        >
+          <Key className="w-4 h-4" />
+          <span>Gift Cards</span>
         </button>
       </div>
 
@@ -910,6 +963,92 @@ export function ProfileView({
                   </button>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === "giftcards" && (
+            <motion.div
+              key="giftcards"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.2 }}
+              className="max-w-xl mx-auto space-y-6"
+            >
+              <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
+                {/* Decorative background element */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
+
+                <div>
+                  <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                    <Key className="w-5 h-5 text-primary" /> Resgatar Gift Card
+                  </h3>
+                  <p className="text-xs text-zinc-500 mt-2 font-sans">
+                    Insira o código do seu Gift Card abaixo para resgatar benefícios exclusivos, como ATTO Coins ou planos premium de assinatura.
+                  </p>
+                </div>
+
+                <form onSubmit={handleRedeemGiftCard} className="space-y-5 relative z-10">
+                  {giftCardMessage && (
+                    <div className={`p-4 rounded-xl text-xs font-mono flex items-center gap-3 ${
+                      giftCardMessage.type === "success" 
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" 
+                        : "bg-rose-500/10 border border-rose-500/20 text-rose-400"
+                    }`}>
+                      {giftCardMessage.type === "success" ? <Award className="w-5 h-5 shrink-0" /> : <Shield className="w-5 h-5 shrink-0" />}
+                      <span className="leading-relaxed">{giftCardMessage.text}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
+                      Código do Cartão
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        value={giftCardCode}
+                        onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                        placeholder="EX: ATTO-XXXX-YYYY-ZZZZ"
+                        className="w-full bg-[#111111] border border-white/10 rounded-xl px-4 py-4 pl-12 text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono tracking-widest"
+                      />
+                      <Key className="w-5 h-5 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isRedeemingCard || !giftCardCode.trim()}
+                    className="w-full bg-primary hover:bg-primary-hover text-white font-bold font-mono rounded-xl px-6 py-4 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRedeemingCard ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Resgatando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Award className="w-5 h-5" />
+                        <span>Ativar Benefício</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Status card to show current coins/plan */}
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="bg-[#111] border border-white/5 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                    <span className="text-zinc-500 text-[10px] font-mono uppercase font-bold tracking-wider mb-1">Meu Plano</span>
+                    <span className="text-lg font-black text-white capitalize">{user.plan || 'Free'}</span>
+                 </div>
+                 <div className="bg-[#111] border border-white/5 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                    <span className="text-zinc-500 text-[10px] font-mono uppercase font-bold tracking-wider mb-1">ATTO Coins</span>
+                    <span className="text-lg font-black text-amber-500">{user.coins || 0}</span>
+                 </div>
+              </div>
+
             </motion.div>
           )}
         </AnimatePresence>

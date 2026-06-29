@@ -82,17 +82,20 @@ export function MediaCard({ media, onPlay, onSelectDetails, isActive }: MediaCar
         </div>
 
         {/* Floating Badges */}
-        <div className="absolute top-3 left-3 flex gap-2">
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md uppercase tracking-wider ${platformStyle.bg}`}>
+        <div className="absolute top-3 left-3">
+          <span className={`text-[9px] font-mono font-black px-2.5 py-1 rounded-full border backdrop-blur-md uppercase tracking-widest ${platformStyle.bg}`}>
             {platformStyle.label}
           </span>
+        </div>
+
+        <div className="absolute top-3 right-3">
           {media.type === "video" ? (
-            <span className="bg-black/60 text-white border border-white/5 px-2 py-1 rounded-md text-[9px] flex items-center gap-1 font-mono">
-              <Video className="w-2.5 h-2.5" /> VIDEO
+            <span className="bg-black/70 text-rose-300 border border-rose-500/35 px-2 py-1 rounded-md text-[9px] font-bold font-mono tracking-wider flex items-center gap-1 backdrop-blur-md">
+              <Video className="w-3 h-3 text-rose-400" /> VIDEO
             </span>
           ) : (
-            <span className="bg-black/60 text-white border border-white/5 px-2 py-1 rounded-md text-[9px] flex items-center gap-1 font-mono">
-              <Music className="w-2.5 h-2.5" /> AUDIO
+            <span className="bg-black/70 text-sky-300 border border-sky-500/35 px-2 py-1 rounded-md text-[9px] font-bold font-mono tracking-wider flex items-center gap-1 backdrop-blur-md">
+              <Music className="w-3 h-3 text-sky-400" /> AUDIO
             </span>
           )}
         </div>

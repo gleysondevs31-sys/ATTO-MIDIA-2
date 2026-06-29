@@ -1,5 +1,6 @@
 import React from "react";
 import { Film, Radio, ShieldCheck, LogIn, LogOut, User, Settings, Shield, Menu, X, Sun, Moon } from "lucide-react";
+import { AttoLogo } from "./AttoLogo";
 
 interface HeaderProps {
   user: any;
@@ -44,15 +45,13 @@ export function Header({
           onClick={() => onSelectView("explore")} 
           className="flex items-center gap-3 cursor-pointer group select-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-rose-700 flex items-center justify-center text-white shadow-lg shadow-rose-950/30 transition-transform group-hover:scale-105 active:scale-95">
-            <Film className="w-5 h-5 animate-pulse" />
-          </div>
+          <AttoLogo size={40} className="shadow-lg transition-transform group-hover:scale-105 active:scale-95" />
           <div className="hidden xs:block">
             <h1 className="text-lg font-display font-black tracking-tight text-white group-hover:text-primary transition-colors">
               ATTO<span className="text-primary font-bold"> DOWNLOADS</span>
             </h1>
             <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest hidden sm:block">
-              Universal Social Streaming Engine
+              ZeroTwo Premium Downloader
             </p>
           </div>
         </div>

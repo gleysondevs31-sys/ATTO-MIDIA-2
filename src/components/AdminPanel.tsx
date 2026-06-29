@@ -28,6 +28,18 @@ interface ActivityLogs {
   favorites: { id: number; title: string; platform: string; created_at: string; username: string; email: string; avatar: string }[];
 }
 
+interface AdminGiftCard {
+  id: number;
+  code: string;
+  type: string;
+  value: number;
+  max_uses: number;
+  uses: number;
+  is_active: boolean;
+  created_at: string;
+  created_by_username: string;
+}
+
 interface AdminPanelProps {
   token: string;
   currentUser: any;
@@ -36,10 +48,11 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ token, currentUser, customPlatforms = [], onRefreshPlatforms }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs" | "platforms">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs" | "platforms" | "giftcards">("stats");
   const [users, setUsers] = useState<UserAdminRow[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [logs, setLogs] = useState<ActivityLogs | null>(null);
+  const [giftCards, setGiftCards] = useState<AdminGiftCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -66,6 +79,14 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
   const [platformApiKeyOverride, setPlatformApiKeyOverride] = useState("");
   const [platformIsEnabled, setPlatformIsEnabled] = useState(true);
   const [isSavingPlatform, setIsSavingPlatform] = useState(false);
+
+  // Gift Card Admin states
+  const [isAddingGiftCard, setIsAddingGiftCard] = useState(false);
+  const [gcCode, setGcCode] = useState("");
+  const [gcType, setGcType] = useState("coins");
+  const [gcValue, setGcValue] = useState(100);
+  const [gcMaxUses, setGcMaxUses] = useState(1);
+  const [isSavingGiftCard, setIsSavingGiftCard] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -96,6 +117,15 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
       const logsData = await logsRes.json();
       if (logsRes.ok && logsData.status) {
         setLogs(logsData.logs);
+      }
+
+      // Fetch gift cards
+      const giftCardsRes = await fetch("/api/admin/gift-cards", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const giftCardsData = await giftCardsRes.json();
+      if (giftCardsRes.ok && giftCardsData.status) {
+        setGiftCards(giftCardsData.giftCards);
       }
     } catch (err: any) {
       console.error("[Admin Fetch Error]:", err.message);
@@ -351,6 +381,68 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
     }
   };
 
+  // Gift Card Handlers
+  const handleSaveGiftCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setIsSavingGiftCard(true);
+
+    try {
+      const res = await fetch("/api/admin/gift-cards", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code: gcCode.trim().toUpperCase(),
+          type: gcType,
+          value: gcValue,
+          max_uses: gcMaxUses
+        })
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.status) {
+        setSuccess("Gift Card criado com sucesso!");
+        setTimeout(() => setSuccess(null), 3000);
+        setIsAddingGiftCard(false);
+        setGcCode("");
+        setGcValue(100);
+        setGcMaxUses(1);
+        fetchData();
+      } else {
+        throw new Error(data.error || "Erro ao criar Gift Card.");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSavingGiftCard(false);
+    }
+  };
+
+  const handleDeleteGiftCard = async (id: number) => {
+    if (!window.confirm("Deseja realmente excluir este Gift Card?")) return;
+
+    try {
+      const res = await fetch(`/api/admin/gift-cards/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.status) {
+        setSuccess("Gift Card removido com sucesso!");
+        setTimeout(() => setSuccess(null), 3000);
+        fetchData();
+      } else {
+        throw new Error(data.error || "Erro ao remover Gift Card.");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   // Filters for user table search
   const filteredUsers = users.filter(u => {
     return (
@@ -466,6 +558,18 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
         >
           <Settings className="w-4 h-4 text-rose-500" />
           <span>Redes &amp; Rotas</span>
+        </button>
+        <button
+          id="btn-admin-tab-giftcards"
+          onClick={() => setActiveTab("giftcards")}
+          className={`px-5 py-3.5 text-xs font-mono font-bold uppercase tracking-widest border-b-2 flex items-center gap-2 transition-all ${
+            activeTab === "giftcards"
+              ? "border-primary text-rose-400 bg-primary/5"
+              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-[#111111]/30"
+          }`}
+        >
+          <Key className="w-4 h-4 text-amber-500" />
+          <span>Gift Cards</span>
         </button>
       </div>
 
@@ -1017,6 +1121,181 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
                 className="w-full bg-primary hover:bg-rose-500 text-white font-bold font-mono uppercase tracking-widest py-3 text-[10px] rounded-xl cursor-pointer shadow-lg active:scale-95 transition-all disabled:opacity-55 mt-4"
               >
                 {isSavingPlatform ? "Salvando Configurações..." : "Confirmar e Salvar Configuração"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tab content 5: GIFT CARDS */}
+      {activeTab === "giftcards" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">Gerenciamento de Gift Cards</h3>
+              <p className="text-xs text-zinc-500">Crie, monitore e remova Gift Cards promocionais.</p>
+            </div>
+            <button
+              onClick={() => setIsAddingGiftCard(true)}
+              className="px-4 py-2 bg-primary hover:bg-rose-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-rose-500/20 active:scale-95 flex items-center gap-2 cursor-pointer"
+            >
+              <Key className="w-3.5 h-3.5" /> Adicionar Novo Código
+            </button>
+          </div>
+
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden overflow-x-auto shadow-sm">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="border-b border-white/5 bg-black/40">
+                  <th className="px-5 py-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Código (Chave)</th>
+                  <th className="px-5 py-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Tipo &amp; Valor</th>
+                  <th className="px-5 py-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Utilização (Atual / Max)</th>
+                  <th className="px-5 py-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">Status / Criador</th>
+                  <th className="px-5 py-4 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 font-mono text-xs text-zinc-300">
+                {giftCards.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-10 text-center text-zinc-500">Nenhum gift card encontrado. Crie o primeiro acima.</td>
+                  </tr>
+                ) : (
+                  giftCards.map(gc => (
+                    <tr key={gc.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-5 py-4 whitespace-nowrap font-bold text-white">
+                         <div className="flex items-center gap-2">
+                           <Key className="w-3 h-3 text-amber-500" />
+                           {gc.code}
+                         </div>
+                      </td>
+                      <td className="px-5 py-4">
+                         <span className={`px-2 py-1 rounded-md text-[9px] uppercase tracking-wider font-bold ${
+                            gc.type === 'coins' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'
+                         }`}>
+                           {gc.type}
+                         </span>
+                         <span className="ml-2 font-bold">{gc.value}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                           <div className="w-full bg-white/5 rounded-full h-1.5 flex-1 max-w-[80px]">
+                              <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(gc.uses / gc.max_uses) * 100}%` }} />
+                           </div>
+                           <span className="text-[10px]">{gc.uses} / {gc.max_uses}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-[10px]">
+                        <div className="flex flex-col gap-1">
+                          {gc.is_active ? (
+                            <span className="text-emerald-400 font-bold">ATIVO</span>
+                          ) : (
+                            <span className="text-rose-400 font-bold">ESGOTADO/INATIVO</span>
+                          )}
+                          <span className="text-zinc-500">Por: @{gc.created_by_username || "Sistema"}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          onClick={() => handleDeleteGiftCard(gc.id)}
+                          className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer inline-block"
+                          title="Excluir Gift Card"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Adding Gift Card Dialog / Modal */}
+      {isAddingGiftCard && (
+        <div id="admin-add-gc-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto pt-20 pb-10">
+          <div className="w-full max-w-lg bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl relative my-auto">
+            <button
+              onClick={() => setIsAddingGiftCard(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mx-auto mb-3">
+                <Key className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-display font-extrabold text-white">Criar Gift Card</h2>
+              <p className="text-xs text-zinc-500 mt-1">Gere um novo código para presentear usuários.</p>
+            </div>
+
+            <form onSubmit={handleSaveGiftCard} className="space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Código do Cartão</label>
+                <div className="flex gap-2">
+                   <input
+                     type="text"
+                     required
+                     value={gcCode}
+                     onChange={(e) => setGcCode(e.target.value.toUpperCase())}
+                     placeholder="EX: VIP-1000"
+                     className="flex-1 bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50 uppercase"
+                   />
+                   <button type="button" onClick={() => setGcCode("ATTO-" + Math.random().toString(36).substring(2, 10).toUpperCase())} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-mono text-zinc-300">
+                     Gerar Aleatório
+                   </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Tipo</label>
+                  <select
+                    value={gcType}
+                    onChange={(e) => setGcType(e.target.value)}
+                    className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50 appearance-none"
+                  >
+                    <option value="coins">ATTO Coins</option>
+                    <option value="pro">Plano PRO</option>
+                    <option value="premium">Plano PREMIUM</option>
+                    <option value="ultra">Plano ULTRA</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">
+                     {gcType === 'coins' ? 'Quantidade (Moedas)' : 'Duração (Dias)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={gcValue}
+                    onChange={(e) => setGcValue(parseInt(e.target.value))}
+                    className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Limite de Usos (Pessoas)</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={gcMaxUses}
+                  onChange={(e) => setGcMaxUses(parseInt(e.target.value))}
+                  className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500/50"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingGiftCard}
+                className="w-full bg-primary hover:bg-rose-500 text-white font-bold font-mono uppercase tracking-widest py-3 text-[10px] rounded-xl cursor-pointer shadow-lg active:scale-95 transition-all disabled:opacity-55 mt-4"
+              >
+                {isSavingGiftCard ? "Criando..." : "Confirmar e Criar"}
               </button>
             </form>
           </div>

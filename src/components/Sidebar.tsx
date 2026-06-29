@@ -1,5 +1,6 @@
 import React from "react";
-import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram } from "lucide-react";
+import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram, Sparkles } from "lucide-react";
+import { AttoLogo } from "./AttoLogo";
 
 interface SidebarProps {
   currentView: string;
@@ -66,7 +67,7 @@ export function Sidebar({
         {/* Mobile Header Inside Sidebar */}
         <div className="flex items-center justify-between lg:hidden border-b border-white/5 pb-3">
           <div className="flex items-center gap-2">
-            <Film className="w-5 h-5 text-primary" />
+            <AttoLogo size={24} />
             <span className="text-sm font-bold tracking-tight text-white font-display">ATTO MENU</span>
           </div>
           <button
@@ -145,6 +146,21 @@ export function Sidebar({
             >
               <Heart className="w-4 h-4 text-zinc-400" />
               <span>Favoritos</span>
+            </button>
+
+            {/* Planos Premium */}
+            <button
+              id="btn-nav-plans-tab"
+              onClick={() => handleSelectNav("plans")}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer relative overflow-hidden group ${
+                currentView === "plans"
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-300 shadow-sm"
+                  : "border-transparent hover:border-amber-500/20 hover:bg-amber-950/5 text-gray-400 hover:text-amber-300"
+              }`}
+            >
+              <Sparkles className={`w-4 h-4 text-amber-400 shrink-0 ${currentView === "plans" ? "animate-pulse" : "group-hover:animate-pulse"}`} />
+              <span>Planos Premium</span>
+              <span className="absolute right-2.5 top-2.5 w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping" />
             </button>
 
             {/* Perfil */}
