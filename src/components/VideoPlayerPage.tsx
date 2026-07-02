@@ -220,6 +220,34 @@ export function VideoPlayerPage({
   const isYoutube = activeMedia?.platform === "youtube";
   const isTikTok = activeMedia?.platform === "tiktok";
 
+  const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
+
+  const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>, url: string, filename: string) => {
+    e.preventDefault();
+    if (downloadingUrl) return;
+    setDownloadingUrl(url);
+    toast.success("Download iniciado", `Processando ${filename}... isso pode levar alguns minutos dependendo do tamanho.`);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Erro no servidor");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Download Concluído", `O arquivo ${filename} foi salvo com sucesso no seu dispositivo!`);
+    } catch (err) {
+      toast.error("Falha no Download", "Ocorreu um erro ao processar o arquivo.");
+    } finally {
+      setDownloadingUrl(null);
+    }
+  };
+
   const audioDownloadUrl = activeMedia
     ? isYoutube
       ? `/api/media/yt-download?type=audio&url=${encodeURIComponent(activeMedia.originalUrl || "")}`
@@ -527,13 +555,15 @@ export function VideoPlayerPage({
                   <a
                     href={audioDownloadUrl!}
                     download={`${activeMedia.title} - Audio.mp3`}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => toast.success("Download iniciado", `Preparando o áudio de '${activeMedia.title}' via proxy...`)}
+                    onClick={(e) => handleDownload(e, audioDownloadUrl!, `${activeMedia.title} - Audio.mp3`)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg transition-all shadow-md shrink-0 cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Baixar</span>
+                    {downloadingUrl === audioDownloadUrl ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    <span>{downloadingUrl === audioDownloadUrl ? "Baixando..." : "Baixar"}</span>
                   </a>
                 ) : (
                   <button
@@ -556,13 +586,15 @@ export function VideoPlayerPage({
                   <a
                     href={videoDownloadUrl!}
                     download={`${activeMedia.title} - Video.mp4`}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => toast.success("Download iniciado", `Iniciando a transferência do vídeo de '${activeMedia.title}'...`)}
+                    onClick={(e) => handleDownload(e, videoDownloadUrl!, `${activeMedia.title} - Video.mp4`)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-lg transition-all shadow-md shrink-0 cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Baixar</span>
+                    {downloadingUrl === videoDownloadUrl ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    <span>{downloadingUrl === videoDownloadUrl ? "Baixando..." : "Baixar"}</span>
                   </a>
                 ) : (
                   <button

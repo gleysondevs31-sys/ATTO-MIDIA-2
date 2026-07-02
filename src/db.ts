@@ -37,6 +37,10 @@ export async function bootstrapDatabase() {
         plan VARCHAR(20) DEFAULT 'free',
         coins INTEGER DEFAULT 0,
         plan_expires_at TIMESTAMP,
+        is_verified BOOLEAN DEFAULT FALSE,
+        verification_token VARCHAR(255),
+        reset_token VARCHAR(255),
+        reset_token_expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -44,6 +48,10 @@ export async function bootstrapDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMP;
     `);
     console.log("[DB] 'users' table verified/created.");
 
@@ -125,24 +133,43 @@ export async function bootstrapDatabase() {
     `);
     console.log("[DB] 'gift_card_redemptions' table verified/created.");
 
+    // 7. Create Banners Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS banners (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(100) NOT NULL,
+        message TEXT NOT NULL,
+        link_url TEXT,
+        type VARCHAR(20) DEFAULT 'info', -- 'info', 'warning', 'success', 'error', 'promo'
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] 'banners' table verified/created.");
+
     // Seed default platforms if empty
     const platformsCount = await client.query("SELECT COUNT(*) FROM platforms_config");
     if (parseInt(platformsCount.rows[0].count) === 0) {
       console.log("[DB] Seeding default platforms into 'platforms_config'...");
       await client.query(`
         INSERT INTO platforms_config (platform_key, name, icon_name, primary_api_url, fallback_api_url) VALUES
-        ('youtube', 'YouTube', 'Youtube', '/api/media/yt-download', 'https://yt-api.zero-two-apis.com.br/api/dl/multidl'),
-        ('soundcloud', 'Soundcloud', 'Music', 'https://zero-two-apis.com.br/api/soundcloud/search', 'https://fallback-apis.com/api/soundcloud/search'),
-        ('spotify', 'Spotify', 'Music', 'https://zero-two-apis.com.br/api/spotify/search', 'https://fallback-apis.com/api/spotify/search'),
-        ('tiktok', 'TikTok', 'Play', 'https://zero-two-apis.com.br/api/download/tiktok/v4', 'https://zero-two-apis.com.br/api/dl/multidl')
+        ('youtube', 'YouTube', 'Youtube', '/api/media/yt-download', 'https://yt-api.zero-two-apis.store/api/dl/multidl'),
+        ('soundcloud', 'Soundcloud', 'Music', 'https://zero-two-apis.store/api/soundcloud/search', 'https://fallback-apis.com/api/soundcloud/search'),
+        ('spotify', 'Spotify', 'Music', 'https://zero-two-apis.store/api/spotify/search', 'https://fallback-apis.com/api/spotify/search'),
+        ('tiktok', 'TikTok', 'Play', 'https://zero-two-apis.store/api/download/tiktok/v4', 'https://zero-two-apis.store/api/dl/multidl')
       `);
       console.log("[DB] Seeding completed!");
     } else {
       // Ensure existing deployments get updated to the new fast/robust YouTube API fallback URL
       await client.query(`
         UPDATE platforms_config 
-        SET fallback_api_url = 'https://yt-api.zero-two-apis.com.br/api/dl/multidl' 
+        SET fallback_api_url = 'https://yt-api.zero-two-apis.store/api/dl/multidl' 
         WHERE platform_key = 'youtube' AND fallback_api_url = 'https://zero-two-apis.com.br/api/dl/multidl'
+      `);
+      await client.query(`
+        UPDATE platforms_config
+        SET primary_api_url = REPLACE(primary_api_url, '.com.br', '.store'),
+            fallback_api_url = REPLACE(fallback_api_url, '.com.br', '.store')
       `);
       console.log("[DB] Existing YouTube config checked and updated if necessary.");
     }

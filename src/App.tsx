@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { get, set } from "idb-keyval";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { SearchBar } from "./components/SearchBar";
@@ -26,6 +27,7 @@ import { DynamicHelmet } from "./components/DynamicHelmet";
 import { PlansView } from "./components/PlansView";
 import { ProviderDownloader } from "./components/ProviderDownloader";
 import { NowPlayingView } from "./components/NowPlayingView";
+import { BannerDisplay } from "./components/BannerDisplay";
 
 export default function App() {
   const { toast } = useToast();
@@ -149,19 +151,34 @@ export default function App() {
   
   const fetchDbFavorites = async (authToken: string) => {
     try {
+      const cached = await get(`favorites_${authToken}`);
+      if (cached && Array.isArray(cached)) setDbFavorites(cached);
+    } catch (e) {
+      console.warn("Failed to read favorites from IndexedDB", e);
+    }
+
+    try {
       const res = await fetch("/api/favorites", {
         headers: { "Authorization": `Bearer ${authToken}` }
       });
       const data = await res.json();
       if (data.status && Array.isArray(data.favorites)) {
         setDbFavorites(data.favorites);
+        set(`favorites_${authToken}`, data.favorites).catch(err => console.warn("Failed to cache favorites", err));
       }
     } catch (err) {
-      console.error("Failed to fetch favorites from PostgreSQL:", err);
+      console.error("Failed to fetch favorites from PostgreSQL, showing offline cache:", err);
     }
   };
 
   const fetchDbHistory = async (authToken: string) => {
+    try {
+      const cached = await get(`history_${authToken}`);
+      if (cached && Array.isArray(cached)) setDbHistory(cached);
+    } catch (e) {
+      console.warn("Failed to read history from IndexedDB", e);
+    }
+
     try {
       const res = await fetch("/api/history", {
         headers: { "Authorization": `Bearer ${authToken}` }
@@ -173,9 +190,10 @@ export default function App() {
           timestamp: Number(h.timestamp)
         }));
         setDbHistory(mapped);
+        set(`history_${authToken}`, mapped).catch(err => console.warn("Failed to cache history", err));
       }
     } catch (err) {
-      console.error("Failed to fetch history from PostgreSQL:", err);
+      console.error("Failed to fetch history from PostgreSQL, showing offline cache:", err);
     }
   };
 
@@ -275,8 +293,17 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.error("Error toggling favorites:", err);
-      toast.error("Erro de conexão", "Não foi possível completar a operação de favoritos.");
+      // Offline fallback
+      let newFavs;
+      if (isAlreadyFavorite) {
+          newFavs = dbFavorites.filter(f => f.originalUrl !== media.originalUrl);
+          toast.info("Aviso Offline", "Removido localmente. Será sincronizado quando reconectar.");
+      } else {
+          newFavs = [{ ...media, created_at: new Date().toISOString() }, ...dbFavorites];
+          toast.info("Aviso Offline", "Salvo localmente. Será sincronizado quando reconectar.");
+      }
+      setDbFavorites(newFavs);
+      set(`favorites_${token}`, newFavs).catch(()=>null);
     }
   };
 
@@ -298,8 +325,11 @@ export default function App() {
         toast.error("Erro ao remover", "Não foi possível remover dos favoritos.");
       }
     } catch (err) {
-      console.error("Error removing favorite:", err);
-      toast.error("Erro de conexão", "Falha de rede ao tentar remover dos favoritos.");
+      // Offline fallback
+      const newFavs = dbFavorites.filter(f => f.originalUrl !== originalUrl);
+      setDbFavorites(newFavs);
+      set(`favorites_${token}`, newFavs).catch(()=>null);
+      toast.info("Aviso Offline", "Removido localmente. Será sincronizado quando reconectar.");
     }
   };
 
@@ -413,6 +443,42 @@ export default function App() {
       if (currentToken) fetchUser(currentToken);
     };
     window.addEventListener("force-auth-refresh", onAuthRefresh);
+
+    // Handle MercadoPago return URLs
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get("status");
+    const paymentPlan = urlParams.get("plan");
+
+    if (paymentStatus === "success" && paymentPlan && savedToken) {
+      toast.success("Pagamento Aprovado!", `Processando seu upgrade para o plano ${paymentPlan.toUpperCase()}...`);
+      // Re-trigger the upgrade to actually grant the plan since MP return is client-side in this mock flow
+      // In production, this would be a webhook.
+      fetch("/api/auth/upgrade", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${savedToken}`
+        },
+        body: JSON.stringify({ plan: paymentPlan })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status) {
+           toast.success("Assinatura Confirmada!", `Parabéns! Você agora é ${paymentPlan.toUpperCase()}!`);
+           window.dispatchEvent(new Event("force-auth-refresh"));
+           // clear url
+           window.history.replaceState({}, document.title, window.location.pathname);
+           setCurrentView("profile");
+        }
+      })
+      .catch(() => toast.error("Erro no upgrade", "Falha ao processar assinatura pós-pagamento."));
+    } else if (paymentStatus === "failure") {
+       toast.error("Pagamento Recusado", "Infelizmente houve um erro na transação do Mercado Pago.");
+       window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentStatus === "pending") {
+       toast.info("Pagamento Pendente", "Seu pagamento está sendo processado. Você receberá o upgrade em breve.");
+       window.history.replaceState({}, document.title, window.location.pathname);
+    }
 
     // Trigger an initial automatic exploration search so the dashboard is beautifully populated on load
     performSearch("lofi chill", "all", false);
@@ -582,16 +648,23 @@ export default function App() {
           setResults(data.results);
           handleAddHistory(searchVal);
           if (token) {
+            const newItem = { query: searchVal, timestamp: Date.now() };
             fetch("/api/history", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
               },
-              body: JSON.stringify({ query: searchVal, timestamp: Date.now() })
+              body: JSON.stringify(newItem)
             })
             .then(() => fetchDbHistory(token))
-            .catch(err => console.error("Postgres history sync error:", err));
+            .catch(err => {
+              console.error("Postgres history sync error:", err);
+              // Offline fallback
+              const updatedDbHistory = [newItem, ...dbHistory.filter(h => h.query.toLowerCase() !== searchVal.toLowerCase())].slice(0, 50);
+              setDbHistory(updatedDbHistory);
+              set(`history_${token}`, updatedDbHistory).catch(()=>null);
+            });
           }
         } else {
           throw new Error(data.error || "Erro desconhecido ao carregar resultados.");
@@ -710,6 +783,8 @@ export default function App() {
                   <Film className="w-6 h-6" />
                 </div>
               </div>
+
+              <BannerDisplay />
 
               {/* Interactive Search Section */}
               <div className="bg-[#111111]/30 border border-white/5 p-6 rounded-2xl">

@@ -356,7 +356,7 @@ export function LegalView({ onBackToExplore, initialTab = "terms" }: LegalViewPr
 
                     <div className="space-y-2.5">
                       <a 
-                        href="https://zero-two-apis.com.br/docs" 
+                        href="https://zero-two-apis.store/docs" 
                         target="_blank" 
                         rel="noreferrer"
                         className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition-all font-mono text-[11px] border border-white/5 cursor-pointer"

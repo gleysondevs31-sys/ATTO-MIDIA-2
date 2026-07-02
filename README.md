@@ -33,7 +33,7 @@ Por regras de segurança de nível de produção, a chave de API `onnx-ia-key` *
 ---
 
 ## 🗺️ Endpoints da API Zero Two Utilizados
-O proxy backend consome diretamente os seguintes endpoints oficiais descritos em `https://zero-two-apis.com.br/docs`:
+O proxy backend consome diretamente os seguintes endpoints oficiais descritos em `https://zero-two-apis.store/docs`:
 
 1. **Busca Spotify**: `/api/spotify/search` (Query: `q`, `type=track`, `limit=15`)
 2. **Busca SoundCloud**: `/api/soundcloud/search` (Query: `query`)
@@ -51,7 +51,7 @@ APP_URL="http://localhost:3000"
 
 # Credenciais oficiais da Zero Two API
 ZERO_TWO_API_KEY="onnx-ia-key"
-ZERO_TWO_API_BASE_URL="https://zero-two-apis.com.br"
+ZERO_TWO_API_BASE_URL="https://zero-two-apis.store"
 ```
 
 ---

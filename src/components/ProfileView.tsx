@@ -18,6 +18,8 @@ interface ProfileViewProps {
     role: string;
     theme: string;
     created_at?: string;
+    plan?: string;
+    coins?: number;
   };
   onUpdateProfile: (updatedData: { username?: string; avatar?: string; bio?: string; theme?: string }) => Promise<boolean>;
   onLogout: () => void;
@@ -345,6 +347,26 @@ export function ProfileView({
             <span className="px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-[10px] font-mono font-semibold text-primary uppercase tracking-wide">
               {getLevelTitle(currentLevel)}
             </span>
+            {user.plan && user.plan !== "free" ? (
+              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-mono font-bold uppercase tracking-wide flex items-center gap-1 shadow-sm
+                ${user.plan === 'ultra' ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' :
+                  user.plan === 'premium' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                  'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                {user.plan === 'ultra' ? 'Plano Ultra' : user.plan === 'premium' ? 'Plano Premium' : 'Plano Pro'}
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/20 text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-wide">
+                Plano Gratuito
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-mono text-zinc-500 pt-1 mb-2">
+            <span>@{user.username.toLowerCase().replace(/\s+/g, "")}</span>
+            <span>•</span>
+            <span>{user.email}</span>
           </div>
           <p className="text-xs text-zinc-400 font-sans max-w-md italic">
             "{bio || "Adoro ouvir música e baixar mídias!"}"

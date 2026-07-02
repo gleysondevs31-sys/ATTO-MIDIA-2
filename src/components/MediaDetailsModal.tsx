@@ -25,39 +25,52 @@ export function MediaDetailsModal({
   if (!media) return null;
   const { toast } = useToast();
   const [requiredPlanForUpgrade, setRequiredPlanForUpgrade] = useState<"pro" | "premium" | null>(null);
+  const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
 
-  const handleDownloadClick = (qualityName: string, requiredTier: "free" | "pro" | "premium", downloadUrl: string | null, filename: string) => {
+  const handleDownloadClick = async (qualityName: string, requiredTier: "free" | "pro" | "premium", downloadUrl: string | null, filename: string) => {
     if (!downloadUrl) {
       toast.error("Link indisponível", "Aguardando geração do link de mídia pelo proxy.");
       return;
     }
+    if (downloadingUrl) return;
 
     const currentPlan = user?.plan || "free";
     
     // Check authorization
     if (requiredTier === "pro") {
-      if (currentPlan !== "pro" && currentPlan !== "premium") {
+      if (currentPlan !== "pro" && currentPlan !== "premium" && currentPlan !== "ultra") {
         setRequiredPlanForUpgrade("pro");
         return;
       }
     } else if (requiredTier === "premium") {
-      if (currentPlan !== "premium") {
+      if (currentPlan !== "premium" && currentPlan !== "ultra") {
         setRequiredPlanForUpgrade("premium");
         return;
       }
     }
 
-    // If authorized, start download!
-    toast.success("Download iniciado", `Preparando download de '${media.title}' em ${qualityName}...`);
-    
-    // Trigger download
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.target = "_blank";
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setDownloadingUrl(downloadUrl);
+    toast.success("Download iniciado", `Processando '${filename}' em ${qualityName}... isso pode levar alguns minutos dependendo do tamanho.`);
+
+    try {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error("Erro no servidor");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Download Concluído", `O arquivo '${filename}' foi salvo com sucesso no seu dispositivo!`);
+    } catch (err) {
+      toast.error("Falha no Download", "Ocorreu um erro ao processar o arquivo.");
+    } finally {
+      setDownloadingUrl(null);
+    }
   };
 
   const handleShare = () => {
@@ -322,9 +335,13 @@ export function MediaDetailsModal({
                     {isAudioValid ? (
                       <button
                         onClick={() => handleDownloadClick("MP3 Standard (128 kbps)", "free", getAudioUrl("free"), `${media.title} - 128kbps.mp3`)}
-                        className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-white transition-all cursor-pointer"
+                        className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        Baixar Grátis
+                        {downloadingUrl === getAudioUrl("free") ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" /> <span>Baixando...</span></>
+                        ) : (
+                          "Baixar Grátis"
+                        )}
                       </button>
                     ) : (
                       <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
@@ -349,9 +366,13 @@ export function MediaDetailsModal({
                     {isAudioValid ? (
                       <button
                         onClick={() => handleDownloadClick("MP3 Ultra HQ (320 kbps)", "pro", getAudioUrl("pro"), `${media.title} - Ultra_320kbps.mp3`)}
-                        className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-amber-300 transition-all cursor-pointer"
+                        className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-amber-300 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        Baixar HQ
+                        {downloadingUrl === getAudioUrl("pro") ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" /> <span>Baixando...</span></>
+                        ) : (
+                          "Baixar HQ"
+                        )}
                       </button>
                     ) : (
                       <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
@@ -380,9 +401,13 @@ export function MediaDetailsModal({
                       {isVideoValid ? (
                         <button
                           onClick={() => handleDownloadClick("Vídeo SD (360p)", "free", getVideoUrl("free"), `${media.title} - 360p.mp4`)}
-                          className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-white transition-all cursor-pointer"
+                          className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          Baixar Grátis
+                          {downloadingUrl === getVideoUrl("free") ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> <span>Baixando...</span></>
+                          ) : (
+                            "Baixar Grátis"
+                          )}
                         </button>
                       ) : (
                         <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
@@ -407,9 +432,13 @@ export function MediaDetailsModal({
                       {isVideoValid ? (
                         <button
                           onClick={() => handleDownloadClick("Vídeo HD (720p)", "pro", getVideoUrl("pro"), `${media.title} - HD_720p.mp4`)}
-                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-amber-300 transition-all cursor-pointer"
+                          className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-amber-300 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          Baixar HD
+                          {downloadingUrl === getVideoUrl("pro") ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> <span>Baixando...</span></>
+                          ) : (
+                            "Baixar HD"
+                          )}
                         </button>
                       ) : (
                         <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">
@@ -434,9 +463,13 @@ export function MediaDetailsModal({
                       {isVideoValid ? (
                         <button
                           onClick={() => handleDownloadClick("Vídeo Full HD (1080p)", "premium", getVideoUrl("premium"), `${media.title} - Full_HD_1080p.mp4`)}
-                          className="w-full py-2 bg-primary/10 hover:bg-primary/25 border border-primary/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-primary transition-all cursor-pointer"
+                          className="w-full py-2 bg-primary/10 hover:bg-primary/25 border border-primary/30 text-[10px] font-bold font-mono uppercase tracking-wider rounded-xl text-primary transition-all cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          Baixar Ultra
+                          {downloadingUrl === getVideoUrl("premium") ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> <span>Baixando...</span></>
+                          ) : (
+                            "Baixar Ultra"
+                          )}
                         </button>
                       ) : (
                         <div className="w-full py-2 bg-[#111111] border border-white/5 text-[10px] text-gray-500 font-mono text-center rounded-xl flex items-center justify-center gap-1.5">

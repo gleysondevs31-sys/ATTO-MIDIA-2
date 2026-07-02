@@ -27,7 +27,7 @@ interface PlanItem {
 export function PlansView({ user, onUpdateUser, onOpenAuth, onSelectView }: PlansViewProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null);
-  const [checkoutMethod, setCheckoutMethod] = useState<"pix" | "card" | "mercadopago">("pix");
+  const [checkoutMethod, setCheckoutMethod] = useState<"pix" | "card" | "mercadopago">("mercadopago");
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardNumber, setCardNumber] = useState("");
   const [cardName, setCardName] = useState("");
@@ -118,6 +118,35 @@ export function PlansView({ user, onUpdateUser, onOpenAuth, onSelectView }: Plan
     if (!user || !selectedPlan) return;
 
     setIsProcessing(true);
+
+    if (checkoutMethod === "mercadopago") {
+      try {
+        const response = await fetch("/api/payments/mercadopago/preference", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("zerotwo_auth_token") || ""}`
+          },
+          body: JSON.stringify({
+            plan: selectedPlan.id,
+            price: parseFloat(selectedPlan.price.replace("R$ ", "").replace(",", "."))
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status && data.init_point) {
+          window.location.href = data.init_point;
+        } else {
+          toast.error("Erro no checkout", data.error || "Não foi possível gerar a página de pagamento do Mercado Pago.");
+          setIsProcessing(false);
+        }
+      } catch (err: any) {
+        toast.error("Falha na conexão", "Erro de rede ao processar o checkout com Mercado Pago.");
+        setIsProcessing(false);
+      }
+      return;
+    }
     
     // Simulate payment processing time
     setTimeout(async () => {
@@ -126,7 +155,7 @@ export function PlansView({ user, onUpdateUser, onOpenAuth, onSelectView }: Plan
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token") || ""}`
+            "Authorization": `Bearer ${localStorage.getItem("zerotwo_auth_token") || ""}`
           },
           body: JSON.stringify({ plan: selectedPlan.id })
         });

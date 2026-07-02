@@ -356,20 +356,11 @@ export function Sidebar({
           <div className="border-t border-white/5 pt-4 text-[11px] text-zinc-500 space-y-2">
             <div className="flex items-center gap-1.5 px-2">
               <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="font-semibold text-zinc-400">Ambiente</span>
+              <span className="font-semibold text-zinc-400">Aviso Legal</span>
             </div>
-            <p className="leading-relaxed bg-[#111111]/60 border border-white/5 p-3 rounded-xl text-[10px] text-zinc-400 font-mono">
-              Chave de API <b className="text-primary select-all">onnx-ia-key</b> ativa em modo proxy.
+            <p className="leading-relaxed bg-[#111111]/60 border border-white/5 p-3 rounded-xl text-[10px] text-zinc-400">
+              Não indexamos nada em nossos servidores. Os downloads realizados são de inteira responsabilidade dos usuários.
             </p>
-            <a
-              href="https://zero-two-apis.com.br/docs"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between text-[10px] text-zinc-400 hover:text-primary transition-all font-mono border border-white/5 p-2.5 rounded-xl hover:border-white/10 bg-[#111111]/20 cursor-pointer"
-            >
-              <span>Docs das APIs</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
         </div>
       </aside>

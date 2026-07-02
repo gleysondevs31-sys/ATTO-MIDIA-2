@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, Database, Star, Search, Shield, Settings, Trash2, Edit3, Key, Clock, Sparkles, RefreshCw, BarChart2, ListTodo, Check, X, AlertTriangle, ShieldCheck, Heart } from "lucide-react";
+import { Users, Database, Star, Search, Shield, Settings, Trash2, Edit3, Key, Clock, Sparkles, RefreshCw, BarChart2, ListTodo, Check, X, AlertTriangle, ShieldCheck, Heart, Megaphone, CreditCard } from "lucide-react";
 import * as Lucide from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 
@@ -48,11 +48,12 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ token, currentUser, customPlatforms = [], onRefreshPlatforms }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs" | "platforms" | "giftcards">("stats");
+  const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs" | "platforms" | "giftcards" | "banners" | "diagnostics" | "setup">("stats");
   const [users, setUsers] = useState<UserAdminRow[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [logs, setLogs] = useState<ActivityLogs | null>(null);
   const [giftCards, setGiftCards] = useState<AdminGiftCard[]>([]);
+  const [banners, setBanners] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -87,6 +88,73 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
   const [gcValue, setGcValue] = useState(100);
   const [gcMaxUses, setGcMaxUses] = useState(1);
   const [isSavingGiftCard, setIsSavingGiftCard] = useState(false);
+
+  // Diagnostics states
+  const [diagnosticResult, setDiagnosticResult] = useState<any | null>(null);
+  const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
+  
+  // MercadoPago Status Polling
+  const [mpStatus, setMpStatus] = useState<{ status: 'active' | 'invalid' | 'loading', details?: any }>({ status: 'loading' });
+
+  const pollMpStatus = async () => {
+    try {
+      const res = await fetch("/api/payments/debug", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        setMpStatus({ status: 'active', details: data.data });
+      } else {
+        setMpStatus({ status: 'invalid' });
+      }
+    } catch (err) {
+      setMpStatus({ status: 'invalid' });
+    }
+  };
+
+  const runDiagnostics = async () => {
+    setIsRunningDiagnostics(true);
+    setDiagnosticResult(null);
+    try {
+      const res = await fetch("/api/payments/debug", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setDiagnosticResult(data);
+    } catch (err: any) {
+      setDiagnosticResult({ status: "error", message: err.message });
+    } finally {
+      setIsRunningDiagnostics(false);
+    }
+  };
+
+  // Setup checklist state
+  const [setupChecklist, setSetupChecklist] = useState({ step1: false, step2: false, step3: false, step4: false });
+  const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
+  const [isLoadingWebhookLogs, setIsLoadingWebhookLogs] = useState(false);
+
+  const fetchWebhookLogs = async () => {
+    setIsLoadingWebhookLogs(true);
+    try {
+      const res = await fetch("/api/admin/webhooks/mercadopago", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWebhookLogs(data.logs || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch webhook logs", err);
+    } finally {
+      setIsLoadingWebhookLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "diagnostics") {
+      fetchWebhookLogs();
+    }
+  }, [activeTab]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -127,6 +195,15 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
       if (giftCardsRes.ok && giftCardsData.status) {
         setGiftCards(giftCardsData.giftCards);
       }
+
+      // Fetch banners
+      const bannersRes = await fetch("/api/admin/banners", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const bannersData = await bannersRes.json();
+      if (bannersRes.ok && bannersData.status) {
+        setBanners(bannersData.banners);
+      }
     } catch (err: any) {
       console.error("[Admin Fetch Error]:", err.message);
       setError("Não foi possível carregar as informações do Postgres. Verifique a conexão.");
@@ -138,6 +215,9 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
   useEffect(() => {
     if (token) {
       fetchData();
+      pollMpStatus(); // Initial check
+      const mpInterval = setInterval(pollMpStatus, 30000); // Poll every 30s
+      return () => clearInterval(mpInterval);
     }
   }, [token]);
 
@@ -571,13 +651,76 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
           <Key className="w-4 h-4 text-amber-500" />
           <span>Gift Cards</span>
         </button>
+        <button
+          id="btn-admin-tab-banners"
+          onClick={() => setActiveTab("banners")}
+          className={`px-5 py-3.5 text-xs font-mono font-bold uppercase tracking-widest border-b-2 flex items-center gap-2 transition-all ${
+            activeTab === "banners"
+              ? "border-primary text-rose-400 bg-primary/5"
+              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-[#111111]/30"
+          }`}
+        >
+          <Megaphone className="w-4 h-4 text-cyan-500" />
+          <span>Banners</span>
+        </button>
+        <button
+          id="btn-admin-tab-diagnostics"
+          onClick={() => setActiveTab("diagnostics")}
+          className={`px-5 py-3.5 text-xs font-mono font-bold uppercase tracking-widest border-b-2 flex items-center gap-2 transition-all ${
+            activeTab === "diagnostics"
+              ? "border-primary text-emerald-400 bg-primary/5"
+              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-[#111111]/30"
+          }`}
+        >
+          <Lucide.Terminal className="w-4 h-4 text-emerald-500" />
+          <span>Diagnósticos</span>
+        </button>
+        <button
+          id="btn-admin-tab-setup"
+          onClick={() => setActiveTab("setup")}
+          className={`px-5 py-3.5 text-xs font-mono font-bold uppercase tracking-widest border-b-2 flex items-center gap-2 transition-all ${
+            activeTab === "setup"
+              ? "border-primary text-blue-400 bg-primary/5"
+              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-[#111111]/30"
+          }`}
+        >
+          <Lucide.BookOpen className="w-4 h-4 text-blue-500" />
+          <span>Setup Guide</span>
+        </button>
       </div>
 
       {/* Tab content 1: STATS */}
       {activeTab === "stats" && stats && (
         <div className="space-y-8">
           {/* Quick numbers Bento */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* MercadoPago Status Card */}
+            <div className={`p-6 border rounded-2xl shadow-sm space-y-2 flex flex-col justify-between ${
+              mpStatus.status === 'active' ? 'bg-emerald-500/5 border-emerald-500/20' : 
+              mpStatus.status === 'invalid' ? 'bg-rose-500/5 border-rose-500/20' : 
+              'bg-[#0c0c0c] border-white/5'
+            }`}>
+              <div>
+                <span className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-500" /> API MercadoPago
+                </span>
+                <div className="mt-2 flex items-center gap-2">
+                  {mpStatus.status === 'loading' ? (
+                    <><RefreshCw className="w-5 h-5 text-zinc-500 animate-spin" /><p className="text-xl font-display font-black text-zinc-400">Verificando...</p></>
+                  ) : mpStatus.status === 'active' ? (
+                    <><Check className="w-5 h-5 text-emerald-400" /><p className="text-xl font-display font-black text-emerald-400">Ativo</p></>
+                  ) : (
+                    <><AlertTriangle className="w-5 h-5 text-rose-500" /><p className="text-xl font-display font-black text-rose-500">Inválido/Expirado</p></>
+                  )}
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-2">
+                {mpStatus.status === 'active' && mpStatus.details ? `Conectado: ${mpStatus.details.first_name}` : 
+                 mpStatus.status === 'invalid' ? 'Token recusado ou não configurado.' : 
+                 'Aguardando resposta da API...'}
+              </p>
+            </div>
+
             <div className="p-6 bg-[#0c0c0c] border border-white/5 rounded-2xl shadow-sm space-y-2">
               <span className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
                 <Users className="w-3.5 h-3.5 text-rose-500" /> Cadastros Totais
@@ -1298,6 +1441,402 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
                 {isSavingGiftCard ? "Criando..." : "Confirmar e Criar"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tab content 6: BANNERS */}
+      {activeTab === "banners" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="space-y-1">
+              <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                Gerenciador de Avisos Globais (Banners)
+              </h4>
+              <p className="text-xs text-zinc-500">
+                Crie alertas promocionais, comunicados de manutenção ou avisos gerais que aparecem para todos os usuários.
+              </p>
+            </div>
+          </div>
+
+          {/* Create Banner Form */}
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-6 shadow-sm">
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.target as HTMLFormElement;
+              const title = (form.elements.namedItem("title") as HTMLInputElement).value;
+              const message = (form.elements.namedItem("message") as HTMLInputElement).value;
+              const link_url = (form.elements.namedItem("link_url") as HTMLInputElement).value;
+              const type = (form.elements.namedItem("type") as HTMLSelectElement).value;
+
+              try {
+                const res = await fetch("/api/admin/banners", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ title, message, link_url, type })
+                });
+                if (res.ok) {
+                  setSuccess("Banner criado com sucesso!");
+                  setTimeout(() => setSuccess(null), 3000);
+                  form.reset();
+                  // Re-fetch banners
+                  const bannersRes = await fetch("/api/admin/banners", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                  });
+                  const bannersData = await bannersRes.json();
+                  if (bannersRes.ok && bannersData.status) {
+                    setBanners(bannersData.banners);
+                  }
+                }
+              } catch (err) {
+                setError("Erro ao criar banner");
+              }
+            }} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Título</label>
+                  <input name="title" type="text" required className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="Ex: Manutenção Programada" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Tipo</label>
+                  <select name="type" className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white">
+                    <option value="info">Informativo</option>
+                    <option value="warning">Aviso / Manutenção</option>
+                    <option value="success">Sucesso / Promoção</option>
+                    <option value="promo">Especial (Destaque)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">Mensagem</label>
+                <input name="message" type="text" required className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="O sistema passará por instabilidades hoje à noite..." />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest block">URL de Redirecionamento (Opcional)</label>
+                <input name="link_url" type="url" className="w-full bg-[#111111] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white" placeholder="https://..." />
+              </div>
+              <button type="submit" className="bg-primary hover:bg-rose-500 text-white font-bold font-mono uppercase tracking-widest px-6 py-2.5 text-[10px] rounded-xl cursor-pointer transition-all">
+                Criar Banner
+              </button>
+            </form>
+          </div>
+
+          {/* List Banners */}
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-[#111111]/50 text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest">
+                  <th className="p-4 pl-6">ID / Tipo</th>
+                  <th className="p-4">Conteúdo</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 pr-6 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs">
+                {banners.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="p-12 text-center text-zinc-500">Nenhum banner encontrado.</td>
+                  </tr>
+                ) : (
+                  banners.map(b => (
+                    <tr key={b.id}>
+                      <td className="p-4 pl-6 font-mono text-zinc-400">
+                        #{b.id} <br/> <span className="text-[10px] uppercase">{b.type}</span>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-white">{b.title}</div>
+                        <div className="text-zinc-500 mt-1">{b.message}</div>
+                        {b.link_url && <a href={b.link_url} className="text-blue-400 hover:underline text-[10px] mt-1 block" target="_blank" rel="noreferrer">Link</a>}
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${b.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {b.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td className="p-4 pr-6 text-right">
+                        <button
+                          onClick={async () => {
+                            if (window.confirm("Deletar banner?")) {
+                              const res = await fetch(`/api/admin/banners/${b.id}`, {
+                                method: "DELETE",
+                                headers: { "Authorization": `Bearer ${token}` }
+                              });
+                              if (res.ok) {
+                                setBanners(prev => prev.filter(item => item.id !== b.id));
+                              }
+                            }
+                          }}
+                          className="p-1.5 rounded-lg border border-white/5 bg-red-950/10 hover:bg-red-950/30 text-rose-400 hover:border-red-500/30 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab content 7: DIAGNOSTICS */}
+      {activeTab === "diagnostics" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="space-y-1">
+              <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                Diagnósticos de Integração
+              </h4>
+              <p className="text-xs text-zinc-500">
+                Verifique o status das APIs e permissões de acesso, como MercadoPago.
+              </p>
+            </div>
+            <button
+              onClick={runDiagnostics}
+              disabled={isRunningDiagnostics}
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            >
+              {isRunningDiagnostics ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Testando...</span>
+                </>
+              ) : (
+                <>
+                  <Lucide.Activity className="w-3.5 h-3.5" />
+                  <span>Executar Testes</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {diagnosticResult && (
+            <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                {diagnosticResult.status === "success" ? (
+                  <Check className="w-5 h-5 text-emerald-500" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-rose-500" />
+                )}
+                <h5 className="font-mono font-bold text-sm text-white">
+                  Resultado: {diagnosticResult.status.toUpperCase()}
+                </h5>
+              </div>
+
+              {diagnosticResult.status === "success" && diagnosticResult.data ? (
+                <div className="space-y-4">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                    <p className="text-xs text-emerald-400 font-mono">
+                      Token MercadoPago Válido. Conectado como: <strong>{diagnosticResult.data.first_name} {diagnosticResult.data.last_name}</strong>
+                    </p>
+                  </div>
+                  <div>
+                    <h6 className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest mb-2">Permissões da Conta e Detalhes</h6>
+                    <pre className="bg-[#111111] p-4 rounded-xl text-xs font-mono text-zinc-300 overflow-x-auto border border-white/5 whitespace-pre-wrap">
+                      {JSON.stringify(diagnosticResult.data, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
+                    <p className="text-xs text-rose-400 font-mono">
+                      Falha ao validar Token do MercadoPago. Verifique as credenciais no arquivo .env.
+                    </p>
+                    {diagnosticResult.message && (
+                      <p className="text-xs text-rose-500/80 mt-1">{diagnosticResult.message}</p>
+                    )}
+                  </div>
+                  {diagnosticResult.error && (
+                    <pre className="bg-[#111111] p-4 rounded-xl text-xs font-mono text-rose-400 overflow-x-auto border border-rose-500/10 whitespace-pre-wrap">
+                      {JSON.stringify(diagnosticResult.error, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Webhook Logs Section */}
+          <div className="bg-[#111111]/50 border border-white/5 rounded-2xl p-6 shadow-sm mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h5 className="font-mono font-bold text-sm text-white flex items-center gap-2">
+                <Lucide.ListTodo className="w-4 h-4 text-emerald-500" />
+                Últimos Logs de Webhook (Mercado Pago)
+              </h5>
+              <button 
+                onClick={fetchWebhookLogs}
+                disabled={isLoadingWebhookLogs}
+                className="text-[10px] text-zinc-400 hover:text-white uppercase font-mono tracking-widest flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoadingWebhookLogs ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+            </div>
+            
+            {webhookLogs.length === 0 ? (
+              <div className="text-center py-6 text-zinc-500 text-xs border border-white/5 rounded-xl border-dashed">
+                Nenhum webhook recebido recentemente.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {webhookLogs.map((log, idx) => (
+                  <div key={idx} className="bg-[#0c0c0c] border border-white/5 rounded-xl p-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </span>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                        log.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400' :
+                        log.status === 'error' ? 'bg-rose-500/10 text-rose-400' :
+                        'bg-zinc-800 text-zinc-400'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </div>
+                    {log.details && (
+                      <p className="text-xs text-zinc-300 font-mono">
+                        {log.details}
+                      </p>
+                    )}
+                    <details className="mt-2 text-xs text-zinc-500 group">
+                      <summary className="cursor-pointer hover:text-zinc-300 transition-colors">
+                        Ver payload completo
+                      </summary>
+                      <pre className="mt-2 bg-[#111111] p-3 rounded-lg overflow-x-auto text-[10px] font-mono text-zinc-400 border border-white/5">
+                        {JSON.stringify(log.body, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab content 8: SETUP GUIDE */}
+      {activeTab === "setup" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="space-y-1">
+              <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                Guia de Instalação e Configuração
+              </h4>
+              <p className="text-xs text-zinc-500">
+                Siga os passos abaixo para configurar os pagamentos e outras integrações no seu ambiente.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[#111111]/50 border border-white/5 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 bg-blue-500/10 rounded-xl">
+                <Lucide.CreditCard className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <h5 className="font-mono font-bold text-sm text-white">Configuração do MercadoPago</h5>
+                <p className="text-xs text-zinc-400">Ative pagamentos automáticos no sistema.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="flex items-start gap-4 p-4 rounded-xl border border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-blue-500 focus:ring-blue-500/20"
+                  checked={setupChecklist.step1}
+                  onChange={(e) => setSetupChecklist(p => ({ ...p, step1: e.target.checked }))}
+                />
+                <div className="space-y-2 flex-1">
+                  <span className={`text-sm font-bold block ${setupChecklist.step1 ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'}`}>
+                    1. Acessar o Painel de Desenvolvedor
+                  </span>
+                  <p className="text-xs text-zinc-500">
+                    Acesse o portal do MercadoPago para gerar suas credenciais.
+                  </p>
+                  <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-wider text-blue-400 hover:text-blue-300">
+                    Abrir Painel do MercadoPago <Lucide.ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-4 p-4 rounded-xl border border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-blue-500 focus:ring-blue-500/20"
+                  checked={setupChecklist.step2}
+                  onChange={(e) => setSetupChecklist(p => ({ ...p, step2: e.target.checked }))}
+                />
+                <div className="space-y-2 flex-1">
+                  <span className={`text-sm font-bold block ${setupChecklist.step2 ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'}`}>
+                    2. Criar Aplicação e Copiar Token
+                  </span>
+                  <p className="text-xs text-zinc-500">
+                    Crie uma nova aplicação no painel. Vá até a seção "Credenciais de Produção" e copie o <code className="text-zinc-400 font-bold">Access Token</code> (geralmente começa com <code className="text-zinc-400">APP_USR-</code>).
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-4 p-4 rounded-xl border border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-blue-500 focus:ring-blue-500/20"
+                  checked={setupChecklist.step3}
+                  onChange={(e) => setSetupChecklist(p => ({ ...p, step3: e.target.checked }))}
+                />
+                <div className="space-y-2 flex-1">
+                  <span className={`text-sm font-bold block ${setupChecklist.step3 ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'}`}>
+                    3. Configurar Variável de Ambiente
+                  </span>
+                  <p className="text-xs text-zinc-500">
+                    Abra o arquivo <code className="text-zinc-400">.env</code> na raiz do projeto e defina a variável <code className="text-blue-400">MERCADOPAGO_ACCESS_TOKEN</code>.
+                  </p>
+                  <pre className="mt-2 text-xs font-mono bg-black/50 border border-white/10 p-3 rounded-lg text-emerald-400 overflow-x-auto">
+                    MERCADOPAGO_ACCESS_TOKEN="APP_USR-xxxxxxxxxxx-..."
+                  </pre>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-4 p-4 rounded-xl border border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-blue-500 focus:ring-blue-500/20"
+                  checked={setupChecklist.step4}
+                  onChange={(e) => setSetupChecklist(p => ({ ...p, step4: e.target.checked }))}
+                />
+                <div className="space-y-2 flex-1">
+                  <span className={`text-sm font-bold block ${setupChecklist.step4 ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'}`}>
+                    4. Validar Integração
+                  </span>
+                  <p className="text-xs text-zinc-500">
+                    Reinicie a aplicação e verifique se o token é válido utilizando a aba de <strong>Diagnósticos</strong>.
+                  </p>
+                  <button 
+                    type="button"
+                    onClick={() => setActiveTab("diagnostics")}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-wider text-emerald-400 hover:text-emerald-300 bg-emerald-400/10 px-3 py-1.5 rounded-lg border border-emerald-400/20"
+                  >
+                    Abrir Aba de Diagnósticos <Lucide.ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </label>
+            </div>
+            
+            <div className="mt-8 flex justify-center">
+               <a 
+                href="https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/integration-configuration" 
+                target="_blank" 
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-bold transition-colors"
+              >
+                Ler Documentação Oficial MercadoPago <Lucide.ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       )}

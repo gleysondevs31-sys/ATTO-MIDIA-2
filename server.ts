@@ -9,9 +9,18 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool, bootstrapDatabase } from "./src/db.ts";
 import ytSearch from "yt-search";
+import crypto from "crypto";
+import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
+import { sendEmail } from "./src/mailer.ts";
 
 // Load environment variables
 dotenv.config();
+
+// Config MercadoPago
+const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4691327005261909-070108-11a727d082a2d8674da55f802d11f53a-543280425';
+const mpClient = new MercadoPagoConfig({ 
+  accessToken: mpToken
+});
 
 const app = express();
 const PORT = 3000;
@@ -169,8 +178,8 @@ function cleanUrl(url: string): string {
 
 // Zero Two Configs - Protect API Key strictly using either API_KEY or ZERO_TWO_API_KEY environment variables
 const API_KEY = process.env.API_KEY || process.env.ZERO_TWO_API_KEY || "onnx-ia-key";
-const API_BASE_URL = cleanUrl(process.env.ZERO_TWO_API_BASE_URL || "https://zero-two-apis.com.br");
-const YT_API_BASE_URL = cleanUrl(process.env.YT_API_BASE_URL || "https://yt-api.zero-two-apis.com.br");
+const API_BASE_URL = cleanUrl(process.env.ZERO_TWO_API_BASE_URL || "https://zero-two-apis.store").replace(".com.br", ".store");
+const YT_API_BASE_URL = cleanUrl(process.env.YT_API_BASE_URL || "https://yt-api.zero-two-apis.store").replace(".com.br", ".store");
 
 app.use(express.json());
 
@@ -228,6 +237,52 @@ async function getPlatformConfig(platformKey: string) {
   }
   return null;
 }
+
+// Middleware to check if third-party service is in maintenance before requests
+async function checkPlatformAvailability(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    let platformKey = "";
+    
+    if (req.path === "/search") {
+      platformKey = (req.query.platform as string || "").toLowerCase();
+      if (platformKey === "all" || !platformKey) {
+        return next(); // "all" will handle individual platform checks internally if needed, or we just let it pass
+      }
+    } else if (req.path === "/media/by-url" && req.body.url) {
+      const url = req.body.url.toLowerCase();
+      if (url.includes("youtube.com") || url.includes("youtu.be")) platformKey = "youtube";
+      else if (url.includes("tiktok.com")) platformKey = "tiktok";
+      else if (url.includes("spotify.com")) platformKey = "spotify";
+      else if (url.includes("soundcloud.com")) platformKey = "soundcloud";
+      else if (url.includes("instagram.com")) platformKey = "instagram";
+    } else if (req.path.startsWith("/media/resolve")) {
+      const url = (req.query.url as string || "").toLowerCase();
+      if (url.includes("youtube.com") || url.includes("youtu.be")) platformKey = "youtube";
+      else if (url.includes("tiktok.com")) platformKey = "tiktok";
+      else if (url.includes("spotify.com")) platformKey = "spotify";
+      else if (url.includes("soundcloud.com")) platformKey = "soundcloud";
+      else if (url.includes("instagram.com")) platformKey = "instagram";
+    }
+
+    if (platformKey) {
+      const config = await getPlatformConfig(platformKey);
+      if (config && config.is_enabled === false) {
+        return res.status(503).json({
+          status: false,
+          error: `Serviço ${config.name} está temporariamente em manutenção.`,
+          code: "SERVICE_MAINTENANCE"
+        });
+      }
+    }
+    next();
+  } catch (err) {
+    next();
+  }
+}
+
+app.use("/api/search", checkPlatformAvailability);
+app.use("/api/media", checkPlatformAvailability);
+
 
 // Helper function to check if a request involves YouTube platform or a YouTube media URL/query
 function isYoutubeRequest(platformKey: string, endpoint: string, params?: Record<string, string>): boolean {
@@ -1404,13 +1459,13 @@ app.get("/api/media/yt-download", async (req, res) => {
 
   // 1. Primary endpoint request based on type
   const targetUrl = type === "video"
-    ? `${base}/video?url=${encodeURIComponent(cleanMediaUrl)}&quality=best&apikey=${API_KEY}`
-    : `${base}/audio?url=${encodeURIComponent(cleanMediaUrl)}&format=mp3&apikey=${API_KEY}`;
+    ? `${API_BASE_URL}/api/dl/ytvideo2?url=${encodeURIComponent(cleanMediaUrl)}&apikey=${API_KEY}`
+    : `${API_BASE_URL}/api/dl/ytaudio?url=${encodeURIComponent(cleanMediaUrl)}&apikey=${API_KEY}`;
 
   console.log(`[YouTube Proxy] Querying ${type} endpoint: ${targetUrl.replace(API_KEY, "HIDDEN")}`);
   
   try {
-    const response = await fetch(targetUrl);
+    const response = await fetch(targetUrl, { redirect: "follow" });
     if (response.ok) {
       const contentType = response.headers.get("content-type") || "";
       if (contentType.includes("application/json") || contentType.includes("text/plain")) {
@@ -1422,7 +1477,16 @@ app.get("/api/media/yt-download", async (req, res) => {
           console.warn("[YouTube Proxy] Failed to parse primary JSON response.");
         }
       } else {
-        directMediaUrl = targetUrl;
+        // Since we got a successful stream, we stream it back directly
+        res.setHeader("content-type", contentType);
+        res.setHeader("access-control-allow-origin", "*");
+        if (response.body) {
+          for await (const chunk of response.body as any) {
+            res.write(chunk);
+          }
+        }
+        res.end();
+        return;
       }
     }
   } catch (err: any) {
@@ -1437,7 +1501,7 @@ app.get("/api/media/yt-download", async (req, res) => {
 
     console.warn(`[YouTube Proxy] Trying fallback endpoint: ${fallbackUrl.replace(API_KEY, "HIDDEN")}`);
     try {
-      const response = await fetch(fallbackUrl);
+      const response = await fetch(fallbackUrl, { redirect: "follow" });
       if (response.ok) {
         const contentType = response.headers.get("content-type") || "";
         if (contentType.includes("application/json") || contentType.includes("text/plain")) {
@@ -1449,7 +1513,16 @@ app.get("/api/media/yt-download", async (req, res) => {
             console.warn("[YouTube Proxy] Failed to parse fallback JSON response.");
           }
         } else {
-          directMediaUrl = fallbackUrl;
+          // Since we got a successful stream, we stream it back directly
+          res.setHeader("content-type", contentType);
+          res.setHeader("access-control-allow-origin", "*");
+          if (response.body) {
+            for await (const chunk of response.body as any) {
+              res.write(chunk);
+            }
+          }
+          res.end();
+          return;
         }
       }
     } catch (err: any) {
@@ -1462,7 +1535,7 @@ app.get("/api/media/yt-download", async (req, res) => {
     const legacyUrl = `${base}/dl?url=${encodeURIComponent(cleanMediaUrl)}&type=${type === "video" ? "video" : "audio"}&apikey=${API_KEY}`;
     console.warn(`[YouTube Proxy] Trying ultimate legacy fallback: ${legacyUrl.replace(API_KEY, "HIDDEN")}`);
     try {
-      const response = await fetch(legacyUrl);
+      const response = await fetch(legacyUrl, { redirect: "follow" });
       if (response.ok) {
         const contentType = response.headers.get("content-type") || "";
         if (contentType.includes("application/json") || contentType.includes("text/plain")) {
@@ -1474,7 +1547,16 @@ app.get("/api/media/yt-download", async (req, res) => {
             console.warn("[YouTube Proxy] Failed to parse ultimate legacy JSON response.");
           }
         } else {
-          directMediaUrl = legacyUrl;
+          // Since we got a successful stream, we stream it back directly
+          res.setHeader("content-type", contentType);
+          res.setHeader("access-control-allow-origin", "*");
+          if (response.body) {
+            for await (const chunk of response.body as any) {
+              res.write(chunk);
+            }
+          }
+          res.end();
+          return;
         }
       }
     } catch (err: any) {
@@ -1488,23 +1570,8 @@ app.get("/api/media/yt-download", async (req, res) => {
 
   console.log(`[YouTube Proxy] Successfully resolved direct media stream URL: ${directMediaUrl}`);
 
-  // 4. Download, cache and send the direct media file, or redirect if it fails
-  try {
-    const cacheResult = await getOrDownloadMedia(directMediaUrl, false);
-    
-    const ext = type === "video" ? "mp4" : "mp3";
-    const filename = `youtube_${type}_${Date.now()}.${ext}`;
-    
-    res.setHeader("content-type", cacheResult.contentType);
-    res.setHeader("content-disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
-    res.setHeader("access-control-allow-origin", "*");
-    
-    return res.sendFile(cacheResult.filePath);
-  } catch (error: any) {
-    console.warn(`[YouTube Proxy Cache Miss/Error] Failed to cache directly: ${error.message}. Redirecting client directly to media URL...`);
-    // Elegant fallback: redirect the client to the direct googlevideo / Catbox URL so their browser handles the streaming directly
-    return res.redirect(directMediaUrl);
-  }
+  // 4. Redirect the client directly to the media URL
+  return res.redirect(directMediaUrl);
 });
 
 async function streamResponse(apiResponse: any, clientResponse: express.Response) {
@@ -1719,16 +1786,25 @@ app.post("/api/auth/register", async (req, res) => {
     const isFirstUser = totalUsers === 0;
     const isNamedAdmin = username.toLowerCase().includes("admin") || email.toLowerCase().includes("admin");
     const roleToAssign = (isFirstUser || isNamedAdmin) ? "admin" : "user";
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
     // Insert user
     const insertRes = await pool.query(
-      `INSERT INTO users (username, email, password, role) 
-       VALUES ($1, $2, $3, $4) 
-       RETURNING id, username, email, avatar, bio, role, theme, plan, created_at`,
-      [username.trim(), email.trim().toLowerCase(), hashedPassword, roleToAssign]
+      `INSERT INTO users (username, email, password, role, verification_token) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, username, email, avatar, bio, role, theme, plan, is_verified, created_at`,
+      [username.trim(), email.trim().toLowerCase(), hashedPassword, roleToAssign, verificationToken]
     );
 
     const user = insertRes.rows[0];
+
+    // Send verification email
+    const verificationLink = `${process.env.APP_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    await sendEmail(
+      user.email,
+      "Verifique sua conta no ATTO Downloads",
+      `<h1>Bem-vindo, ${user.username}!</h1><p>Por favor, verifique seu email clicando no link abaixo:</p><a href="${verificationLink}">Verificar Email</a>`
+    );
 
     // Generate JWT Token
     const token = jwt.sign(
@@ -1741,6 +1817,82 @@ app.post("/api/auth/register", async (req, res) => {
   } catch (err: any) {
     console.error("[Register Error]:", err.message);
     return res.status(500).json({ error: "Erro interno ao cadastrar usuário", details: err.message });
+  }
+});
+
+// Verify Email Route
+app.get("/api/auth/verify-email", async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ error: "Token não fornecido" });
+
+  try {
+    const result = await pool.query(
+      "UPDATE users SET is_verified = TRUE, verification_token = NULL WHERE verification_token = $1 RETURNING id",
+      [token]
+    );
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: "Token inválido ou expirado." });
+    }
+    return res.json({ status: true, message: "Email verificado com sucesso!" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Erro ao verificar email" });
+  }
+});
+
+// Request Password Reset
+app.post("/api/auth/request-password-reset", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email obrigatório" });
+
+  try {
+    const userCheck = await pool.query("SELECT id, username FROM users WHERE email = $1", [email.toLowerCase()]);
+    if (userCheck.rows.length > 0) {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiration
+
+      await pool.query(
+        "UPDATE users SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3",
+        [resetToken, expiresAt, userCheck.rows[0].id]
+      );
+
+      const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+      await sendEmail(
+        email,
+        "Redefinição de Senha - ATTO Downloads",
+        `<h1>Olá, ${userCheck.rows[0].username}</h1><p>Você solicitou a redefinição de senha. Clique no link abaixo:</p><a href="${resetLink}">Redefinir Senha</a><p>Se você não solicitou isso, ignore este email.</p>`
+      );
+    }
+    // Always return success to prevent email enumeration
+    return res.json({ status: true, message: "Se o email existir, um link de redefinição foi enviado." });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Erro ao processar requisição" });
+  }
+});
+
+// Reset Password
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) return res.status(400).json({ error: "Token e nova senha obrigatórios" });
+
+  try {
+    const userCheck = await pool.query(
+      "SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires_at > NOW()",
+      [token]
+    );
+    if (userCheck.rows.length === 0) {
+      return res.status(400).json({ error: "Token inválido ou expirado" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      "UPDATE users SET password = $1, reset_token = NULL, reset_token_expires_at = NULL WHERE id = $2",
+      [hashedPassword, userCheck.rows[0].id]
+    );
+
+    return res.json({ status: true, message: "Senha redefinida com sucesso!" });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Erro ao redefinir senha" });
   }
 });
 
@@ -1888,6 +2040,151 @@ app.post("/api/auth/upgrade", authenticateToken, async (req, res) => {
     console.error("[Upgrade Plan Error]:", err.message);
     return res.status(500).json({ error: "Erro ao processar upgrade de plano", details: err.message });
   }
+});
+
+// MercadoPago Debug Route
+app.get("/api/payments/debug", async (req, res) => {
+  try {
+    const token = mpToken; // Use the globally defined token that includes your fallback
+    if (!token) {
+      return res.status(500).json({ status: "error", message: "Token not found in environment variables" });
+    }
+
+    const response = await fetch("https://api.mercadopago.com/users/me", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      return res.json({ status: "success", data });
+    } else {
+      return res.status(response.status).json({ status: "error", error: data });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+// MercadoPago Create Preference Route
+app.post("/api/payments/mercadopago/preference", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  const { plan, price } = req.body;
+  if (!plan || !price) {
+    return res.status(400).json({ error: "Parâmetros insuficientes" });
+  }
+
+  try {
+    const preference = new Preference(mpClient);
+    
+    // Create the preference with standard MP payload structure
+    const result = await preference.create({
+      body: {
+        items: [
+          {
+            id: `plan_${plan}`,
+            title: `Assinatura ${plan.toUpperCase()} - ATTO Downloads`,
+            quantity: 1,
+            unit_price: Number(price),
+            currency_id: "BRL",
+            description: "Plano mensal ATTO Downloads"
+          }
+        ],
+        payer: {
+          email: authReq.user.email || "test@example.com"
+        },
+        back_urls: {
+          success: `${req.headers.origin}/?status=success&plan=${plan}`,
+          failure: `${req.headers.origin}/?status=failure`,
+          pending: `${req.headers.origin}/?status=pending`
+        },
+        auto_return: "approved",
+        external_reference: JSON.stringify({ userId: authReq.user.id, plan }),
+        notification_url: `${req.protocol}://${req.get("host")}/api/webhooks/mercadopago`
+      }
+    });
+
+    res.json({ status: true, init_point: result.init_point });
+  } catch (error: any) {
+    console.error("[MercadoPago Error]:", error);
+    res.status(500).json({ error: "Erro ao gerar página de pagamento" });
+  }
+});
+
+// In-memory Webhook Logs
+const mpWebhookLogs: any[] = [];
+const MAX_WEBHOOK_LOGS = 50;
+
+app.get("/api/admin/webhooks/mercadopago", authenticateToken, requireAdmin, (req, res) => {
+  return res.json({ logs: mpWebhookLogs });
+});
+
+// MercadoPago Webhook
+app.post("/api/webhooks/mercadopago", async (req, res) => {
+  const logEntry = {
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    body: req.body,
+    status: "received",
+    details: ""
+  };
+  mpWebhookLogs.unshift(logEntry);
+  if (mpWebhookLogs.length > MAX_WEBHOOK_LOGS) {
+    mpWebhookLogs.pop();
+  }
+
+  const { type, data } = req.body;
+
+  if (type === "payment" && data?.id) {
+    try {
+      const paymentClient = new Payment(mpClient);
+      const payment = await paymentClient.get({ id: data.id });
+      
+      if (payment.status === "approved" && payment.external_reference) {
+        logEntry.status = "approved";
+        try {
+          const extRef = JSON.parse(payment.external_reference);
+          const userId = extRef.userId;
+          const plan = extRef.plan;
+          
+          if (userId && plan) {
+            let expiresAt = new Date();
+            if (plan === "pro" || plan === "premium") {
+              expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 mês
+            } else if (plan === "ultra") {
+              expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 ano
+            } else {
+              expiresAt.setMonth(expiresAt.getMonth() + 1);
+            }
+            
+            await pool.query(
+              "UPDATE users SET plan = $1, plan_expires_at = $2 WHERE id = $3",
+              [plan.toLowerCase(), expiresAt, userId]
+            );
+            logEntry.details = `User ${userId} upgraded to ${plan}`;
+            console.log(`[Webhook] User ${userId} upgraded to ${plan} via MercadoPago payment ${data.id}`);
+          }
+        } catch (parseErr: any) {
+          logEntry.details = `Parse Error: ${parseErr.message}`;
+          console.error("[Webhook] Erro ao parsear external_reference:", parseErr);
+        }
+      } else {
+        logEntry.status = payment.status || "unhandled";
+        logEntry.details = `Payment status: ${payment.status}`;
+      }
+    } catch (err: any) {
+      logEntry.status = "error";
+      logEntry.details = err.message;
+      console.error("[Webhook] Erro ao consultar pagamento no MercadoPago:", err);
+    }
+  }
+
+  // MP expects 200 OK
+  return res.status(200).send("OK");
 });
 
 // Change Password Route
@@ -2584,6 +2881,70 @@ app.delete("/api/admin/platforms/:id", authenticateToken, requireAdmin, async (r
 // ==========================================
 // ADMIN GIFT CARDS MANAGEMENT
 // ==========================================
+
+// Banners API Routes
+app.get("/api/banners/active", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM banners WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 5");
+    return res.json({ status: true, banners: result.rows });
+  } catch (err: any) {
+    console.error("[Get Active Banners Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao buscar banners ativos." });
+  }
+});
+
+app.get("/api/admin/banners", authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM banners ORDER BY created_at DESC");
+    return res.json({ status: true, banners: result.rows });
+  } catch (err: any) {
+    console.error("[Admin Get Banners Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao buscar banners." });
+  }
+});
+
+app.post("/api/admin/banners", authenticateToken, requireAdmin, async (req, res) => {
+  const { title, message, link_url, type, is_active } = req.body;
+  if (!title || !message) {
+    return res.status(400).json({ error: "Os campos title e message são obrigatórios." });
+  }
+  try {
+    const result = await pool.query(
+      "INSERT INTO banners (title, message, link_url, type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [title, message, link_url || null, type || 'info', is_active !== undefined ? is_active : true]
+    );
+    return res.json({ status: true, banner: result.rows[0] });
+  } catch (err: any) {
+    console.error("[Admin Create Banner Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao criar banner." });
+  }
+});
+
+app.put("/api/admin/banners/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { title, message, link_url, type, is_active } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE banners SET title = $1, message = $2, link_url = $3, type = $4, is_active = $5 WHERE id = $6 RETURNING *",
+      [title, message, link_url || null, type || 'info', is_active, id]
+    );
+    return res.json({ status: true, banner: result.rows[0] });
+  } catch (err: any) {
+    console.error("[Admin Update Banner Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao atualizar banner." });
+  }
+});
+
+app.delete("/api/admin/banners/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("DELETE FROM banners WHERE id = $1", [id]);
+    return res.json({ status: true });
+  } catch (err: any) {
+    console.error("[Admin Delete Banner Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao deletar banner." });
+  }
+});
 
 app.get("/api/admin/gift-cards", authenticateToken, requireAdmin, async (req, res) => {
   try {

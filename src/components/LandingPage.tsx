@@ -706,7 +706,7 @@ export function LandingPage({
                   </button>
                 </li>
                 <li>
-                  <a href="https://zero-two-apis.com.br/docs" target="_blank" rel="noreferrer" className="hover:text-white hover:underline transition-colors block">
+                  <a href="https://zero-two-apis.store/docs" target="_blank" rel="noreferrer" className="hover:text-white hover:underline transition-colors block">
                     Documentação Oficial API
                   </a>
                 </li>
