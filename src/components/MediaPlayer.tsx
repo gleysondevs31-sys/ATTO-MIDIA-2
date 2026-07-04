@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, X, Maximize2, ExternalLink, Music, Video, Loader2, SkipForward, Share2 } from "lucide-react";
 import { NormalizedMedia } from "../types";
 import { useToast } from "./Toast";
+import { AudioEqualizer } from "./AudioEqualizer";
 
 interface MediaPlayerProps {
   media: NormalizedMedia | null;
@@ -248,6 +249,7 @@ export function MediaPlayer({
         <video
           ref={videoRef}
           src={mediaUrl || undefined}
+          crossOrigin={media.platform === "youtube" ? undefined : "anonymous"}
           className="hidden"
           onCanPlay={handleCanPlay}
           onTimeUpdate={handleTimeUpdate}
@@ -259,6 +261,7 @@ export function MediaPlayer({
         <audio
           ref={audioRef}
           src={mediaUrl || undefined}
+          crossOrigin={media.platform === "youtube" ? undefined : "anonymous"}
           className="hidden"
           onCanPlay={handleCanPlay}
           onTimeUpdate={handleTimeUpdate}
@@ -436,6 +439,15 @@ export function MediaPlayer({
           </div>
 
           <div className="h-4 w-px bg-white/5 hidden md:block" />
+          
+          <div className="relative flex items-center">
+            <AudioEqualizer 
+              audioRef={audioRef} 
+              videoRef={videoRef} 
+              activeType={media.type as "audio" | "video"}
+              disabled={media.platform === "youtube"}
+            />
+          </div>
 
           {/* Share Button */}
           <button

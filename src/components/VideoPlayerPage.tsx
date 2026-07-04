@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { NormalizedMedia, formatDuration } from "../types";
 import { useToast } from "./Toast";
+import { AudioEqualizer } from "./AudioEqualizer";
 
 interface VideoPlayerPageProps {
   activeMedia: NormalizedMedia | null;
@@ -340,6 +341,7 @@ export function VideoPlayerPage({
             <video
               ref={videoRef}
               src={mediaUrl}
+              crossOrigin={activeMedia.platform === "youtube" ? undefined : "anonymous"}
               className="w-full h-full object-contain"
               onCanPlay={handleCanPlay}
               onTimeUpdate={handleTimeUpdate}
@@ -483,6 +485,14 @@ export function VideoPlayerPage({
                   <span className={`w-1.5 h-1.5 rounded-full ${isAutoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
                   <span>AUTOPLAY: {isAutoplayEnabled ? "LIGADO" : "DESLIGADO"}</span>
                 </button>
+
+                <div className="relative flex items-center">
+                  <AudioEqualizer 
+                    videoRef={videoRef} 
+                    activeType="video"
+                    disabled={activeMedia.platform === "youtube"}
+                  />
+                </div>
 
                 <button
                   onClick={handleFullscreen}
