@@ -23,6 +23,65 @@ import { NormalizedMedia, formatDuration } from "../types";
 import { useToast } from "./Toast";
 import { AudioEqualizer } from "./AudioEqualizer";
 
+export function getYoutubeVideoId(media: any): string {
+  if (!media) return "";
+  
+  const extractFromUrl = (url: string): string | null => {
+    if (!url) return null;
+    try {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = url.match(regExp);
+      if (match && match[2] && match[2].length === 11) {
+        return match[2];
+      }
+      
+      const urlObj = new URL(url);
+      const vParam = urlObj.searchParams.get("v");
+      if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
+        return vParam;
+      }
+      
+      const pathParts = urlObj.pathname.split("/");
+      for (const part of pathParts) {
+        if (part && part.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(part)) {
+          return part;
+        }
+      }
+    } catch (e) {
+      const match = url.match(/[?&]v=([^&#]+)/) || url.match(/youtu\.be\/([^&#?]+)/);
+      if (match && match[1] && match[1].length === 11) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  if (typeof media.id === "string") {
+    const idTrimmed = media.id.trim();
+    if (idTrimmed.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(idTrimmed)) {
+      return idTrimmed;
+    }
+    const extracted = extractFromUrl(idTrimmed);
+    if (extracted) return extracted;
+  }
+
+  if (media.originalUrl) {
+    const extracted = extractFromUrl(media.originalUrl);
+    if (extracted) return extracted;
+  }
+
+  if (media.playableVideoUrl) {
+    const extracted = extractFromUrl(media.playableVideoUrl);
+    if (extracted) return extracted;
+  }
+  if (media.playableAudioUrl) {
+    const extracted = extractFromUrl(media.playableAudioUrl);
+    if (extracted) return extracted;
+  }
+
+  return media.id || "";
+}
+
 interface VideoPlayerPageProps {
   activeMedia: NormalizedMedia | null;
   relatedMedias: NormalizedMedia[];
@@ -145,6 +204,7 @@ export function VideoPlayerPage({
 
     let isDestroyed = false;
     let pollInterval: any = null;
+    const ytVideoId = getYoutubeVideoId(activeMedia);
 
     const initYTPlayer = () => {
       if (isDestroyed || !ytContainerRef.current) return;
@@ -158,7 +218,7 @@ export function VideoPlayerPage({
         setCurrentTime(0);
         try {
           ytPlayerRef.current.loadVideoById({
-            videoId: activeMedia.id,
+            videoId: ytVideoId,
             suggestedQuality: "default"
           });
         } catch (err) {
@@ -181,7 +241,7 @@ export function VideoPlayerPage({
 
       try {
         ytPlayerRef.current = new YT.Player(playerDiv.id, {
-          videoId: activeMedia.id,
+          videoId: ytVideoId,
           height: "100%",
           width: "100%",
           playerVars: {
@@ -201,7 +261,7 @@ export function VideoPlayerPage({
               if (isMuted) {
                 event.target.mute();
               } else {
-                event.target.unmute();
+                event.target.unMute();
               }
               event.target.playVideo();
               setDuration(event.target.getDuration() || 0);
@@ -257,7 +317,7 @@ export function VideoPlayerPage({
       isDestroyed = true;
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [activeMedia?.id]);
+  }, [activeMedia, getYoutubeVideoId(activeMedia)]);
 
   // Poll current time for YouTube player progress bar
   useEffect(() => {
@@ -270,7 +330,7 @@ export function VideoPlayerPage({
     }, 250);
 
     return () => clearInterval(interval);
-  }, [isPlaying, activeMedia?.id]);
+  }, [isPlaying, activeMedia, getYoutubeVideoId(activeMedia)]);
 
   // Handle Video events (for non-YouTube HTML5 players)
   const handleCanPlay = () => {
@@ -360,7 +420,7 @@ export function VideoPlayerPage({
       if (nextMuted) {
         ytPlayerRef.current.mute();
       } else {
-        ytPlayerRef.current.unmute();
+        ytPlayerRef.current.unMute();
         if (volume === 0) {
           setVolume(0.5);
           ytPlayerRef.current.setVolume(50);
