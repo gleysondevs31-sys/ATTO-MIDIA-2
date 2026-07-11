@@ -5,10 +5,12 @@ dotenv.config();
 
 const connectionString = process.env.DATABASE_URL || "postgresql://postgres:ltNfCPskyOCFYCLZJDLEhJDygdRqpdhs@switchyard.proxy.rlwy.net:18922/railway";
 
+const isLocal = connectionString.includes("localhost") || connectionString.includes("127.0.0.1") || connectionString.includes("::1");
+
 // Create connection pool
 export const pool = new pg.Pool({
   connectionString,
-  ssl: connectionString.includes("railway") || connectionString.includes("localhost") ? false : { rejectUnauthorized: false },
+  ssl: isLocal ? false : { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
@@ -21,8 +23,9 @@ pool.on("error", (err) => {
 // Auto-bootstrap schemas on startup
 export async function bootstrapDatabase() {
   console.log("[DB] Starting database auto-bootstrap...");
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     // 1. Create Users Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -178,6 +181,8 @@ export async function bootstrapDatabase() {
   } catch (error: any) {
     console.error("[DB] Database auto-bootstrap failed:", error.message);
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 }
