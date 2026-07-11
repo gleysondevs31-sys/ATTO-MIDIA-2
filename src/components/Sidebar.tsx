@@ -32,9 +32,8 @@ export function Sidebar({
   const categories = [
     { id: "all", name: "Todas Mídias", icon: LayoutGrid, color: "hover:text-white" },
     { id: "youtube", name: "YouTube", icon: Youtube, color: "hover:text-red-400" },
-    { id: "soundcloud", name: "Soundcloud", icon: Music, color: "hover:text-orange-400" },
-    { id: "spotify", name: "Spotify", icon: Music, color: "hover:text-emerald-400" },
     { id: "tiktok", name: "TikTok", icon: Play, color: "hover:text-sky-400" },
+    { id: "instagram", name: "Instagram", icon: Instagram, color: "hover:text-pink-400" },
   ];
 
   const handleSelectNav = (view: string) => {
@@ -252,32 +251,6 @@ export function Sidebar({
             >
               <Instagram className="w-4 h-4 text-pink-500" />
               <span>Instagram Reels</span>
-            </button>
-
-            <button
-              id="btn-nav-dl-spotify"
-              onClick={() => handleSelectNav("downloader-spotify")}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
-                currentView === "downloader-spotify"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-white shadow-sm"
-                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
-              }`}
-            >
-              <Music className="w-4 h-4 text-emerald-500" />
-              <span>Spotify MP3</span>
-            </button>
-
-            <button
-              id="btn-nav-dl-soundcloud"
-              onClick={() => handleSelectNav("downloader-soundcloud")}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
-                currentView === "downloader-soundcloud"
-                  ? "border-orange-500/30 bg-orange-500/10 text-white shadow-sm"
-                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
-              }`}
-            >
-              <Music className="w-4 h-4 text-orange-500" />
-              <span>SoundCloud Audio</span>
             </button>
           </div>
         </div>

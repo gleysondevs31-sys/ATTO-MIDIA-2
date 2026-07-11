@@ -18,11 +18,11 @@ export function DynamicHelmet({
 }: DynamicHelmetProps) {
   useEffect(() => {
     // 1. Determine Title and Description based on active states
-    let title = "ATTO Downloads - Baixar Vídeos do YouTube, TikTok, Spotify e SoundCloud";
-    let description = "A melhor e mais rápida plataforma online para pesquisar, reproduzir, converter e baixar vídeos ou áudios do YouTube, TikTok (sem marca d'água), Spotify e SoundCloud. 100% gratuito, seguro e ilimitado.";
+    let title = "ATTO Downloads - Baixar Vídeos do YouTube, TikTok e Instagram";
+    let description = "A melhor e mais rápida plataforma online para pesquisar, reproduzir, converter e baixar vídeos ou áudios do YouTube, TikTok (sem marca d'água) e Instagram Reels. 100% gratuito, seguro e ilimitado.";
     let image = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&q=80"; // Default professional brand image
     let url = "https://atto-downloads.com/";
-    let keywords = "baixar video youtube, downloader tiktok, salvar video tiktok sem marca d'agua, conversor youtube mp3, baixar musica spotify, soundcloud downloader, media proxy downloader, zero two atto, conversor de video online gratis";
+    let keywords = "baixar video youtube, downloader tiktok, salvar video tiktok sem marca d'agua, conversor youtube mp3, baixar reels instagram, instagram downloader, media proxy downloader, zero two atto, conversor de video online gratis";
 
     // Format platform name for readability
     const getPlatformLabel = (plat: string) => {
@@ -65,8 +65,8 @@ export function DynamicHelmet({
             url = `https://atto-downloads.com/?q=${encodeURIComponent(cleanQuery)}&platform=${selectedPlatform}`;
             keywords = `${cleanQuery.toLowerCase()}, pesquisar ${cleanQuery.toLowerCase()}, baixar ${cleanQuery.toLowerCase()}, converter ${cleanQuery.toLowerCase()}, ${keywords}`;
           } else {
-            title = "Explorar Mídias Populares - YouTube, TikTok, Spotify, SoundCloud | ATTO Downloads";
-            description = "Descubra e explore as músicas, vídeos e áudios que estão bombando nas redes. Filtre por plataforma e faça o download instantâneo em alta fidelidade.";
+            title = "Explorar Mídias Populares - YouTube, TikTok, Instagram | ATTO Downloads";
+            description = "Descubra e explore as músicas, vídeos e Reels que estão bombando nas redes. Filtre por plataforma e faça o download instantâneo em alta fidelidade.";
             url = "https://atto-downloads.com/?view=explore";
           }
           break;
@@ -105,8 +105,8 @@ export function DynamicHelmet({
 
         case "landing":
         default:
-          title = "ATTO Downloads - Baixar Vídeos do YouTube, TikTok, Spotify e SoundCloud";
-          description = "A melhor e mais rápida plataforma online para pesquisar, reproduzir, converter e baixar vídeos ou áudios do YouTube, TikTok (sem marca d'água), Spotify e SoundCloud. 100% gratuito, seguro e ilimitado.";
+          title = "ATTO Downloads - Baixar Vídeos do YouTube, TikTok e Instagram";
+          description = "A melhor e mais rápida plataforma online para pesquisar, reproduzir, converter e baixar vídeos ou áudios do YouTube, TikTok (sem marca d'água) e Instagram Reels. 100% gratuito, seguro e ilimitado.";
           url = "https://atto-downloads.com/";
           break;
       }

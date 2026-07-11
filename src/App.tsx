@@ -705,12 +705,13 @@ export default function App() {
             onSearch={(q) => {
               setQuery(q);
               setCurrentView("explore");
-              const isUrl = q.startsWith("http://") || q.startsWith("https://") || q.includes("youtube.com") || q.includes("youtu.be") || q.includes("spotify.com") || q.includes("soundcloud.com") || q.includes("tiktok.com");
+              const isUrl = q.startsWith("http://") || q.startsWith("https://") || q.includes("youtube.com") || q.includes("youtu.be") || q.includes("tiktok.com") || q.includes("instagram.com");
               performSearch(q, selectedPlatform, isUrl);
             }}
             theme={theme}
             onToggleTheme={() => setTheme(prev => prev === "light" ? "dark" : "light")}
             onSelectView={setCurrentView}
+            onSelectPlatform={(platform) => setSelectedPlatform(platform)}
           />
         </div>
       ) : (
@@ -775,7 +776,7 @@ export default function App() {
                     O que você quer assistir ou ouvir hoje?
                   </h2>
                   <p className="text-sm text-gray-400 max-w-xl">
-                    Pesquise por nome no Spotify e SoundCloud ou cole um link do TikTok, YouTube ou Reels do Instagram para reproduzir e baixar.
+                    Pesquise por nome de vídeos e músicas do YouTube ou cole um link do TikTok, YouTube ou Reels do Instagram para reproduzir e baixar.
                   </p>
                 </div>
                 

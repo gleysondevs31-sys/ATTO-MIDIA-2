@@ -70,7 +70,7 @@ export function PlansView({ user, onUpdateUser, onOpenAuth, onSelectView }: Plan
         "Downloads de vídeo HD (720p)",
         "Velocidade de download 5x mais rápida",
         "Downloads ilimitados de qualquer plataforma",
-        "Acesso total ao SoundCloud, Spotify e YouTube",
+        "Acesso total ao YouTube, TikTok e Instagram",
         "Suporte a salvamento na nuvem (Favoritos & Histórico)"
       ]
     },

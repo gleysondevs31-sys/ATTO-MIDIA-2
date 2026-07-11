@@ -261,12 +261,12 @@ export function ProfileView({
     },
     {
       id: "music_fan",
-      title: "Melômano",
-      desc: "Salvou 5 ou mais mídias de música (Spotify / SoundCloud) nos favoritos.",
+      title: "Explorador YouTube",
+      desc: "Salvou 5 ou mais mídias do YouTube nos favoritos.",
       icon: Heart,
-      color: "from-emerald-500 to-teal-500",
-      unlocked: favorites.filter(f => f.platform === "spotify" || f.platform === "soundcloud").length >= 5,
-      progress: `${favorites.filter(f => f.platform === "spotify" || f.platform === "soundcloud").length}/5`
+      color: "from-red-500 to-rose-600",
+      unlocked: favorites.filter(f => f.platform === "youtube").length >= 5,
+      progress: `${favorites.filter(f => f.platform === "youtube").length}/5`
     },
     {
       id: "collector_elite",
@@ -300,9 +300,8 @@ export function ProfileView({
   // Recharts Favorites Platform Stats
   const platformStats = [
     { name: "YouTube", value: favorites.filter(f => f.platform === "youtube").length, color: "#f43f5e" },
-    { name: "Spotify", value: favorites.filter(f => f.platform === "spotify").length, color: "#10b981" },
-    { name: "SoundCloud", value: favorites.filter(f => f.platform === "soundcloud").length, color: "#f59e0b" },
     { name: "TikTok", value: favorites.filter(f => f.platform === "tiktok").length, color: "#0ea5e9" },
+    { name: "Instagram", value: favorites.filter(f => f.platform === "instagram").length, color: "#d946ef" },
   ].filter(stat => stat.value > 0);
 
   const formattedJoinDate = user.created_at

@@ -168,7 +168,7 @@ export function SearchBar({ onSearch, isLoading, initialQuery = "", selectedPlat
         {selectedPlatform !== "tiktok" && (
           <div className="hidden sm:flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-            <span>Busca por texto: Spotify, Soundcloud e TikTok</span>
+            <span>Busca por texto: YouTube e TikTok</span>
           </div>
         )}
       </div>

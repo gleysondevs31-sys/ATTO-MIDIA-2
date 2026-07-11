@@ -1,5 +1,5 @@
 import React from "react";
-import { LayoutGrid, Youtube, Music, Play } from "lucide-react";
+import { LayoutGrid, Youtube, Music, Play, Instagram } from "lucide-react";
 
 interface PlatformFilterProps {
   selectedPlatform: string;
@@ -10,9 +10,8 @@ export function PlatformFilter({ selectedPlatform, onSelectPlatform }: PlatformF
   const categories = [
     { id: "all", name: "Todas Mídias", icon: LayoutGrid, color: "hover:text-white" },
     { id: "youtube", name: "YouTube", icon: Youtube, color: "hover:text-red-400" },
-    { id: "soundcloud", name: "Soundcloud", icon: Music, color: "hover:text-orange-400" },
-    { id: "spotify", name: "Spotify", icon: Music, color: "hover:text-emerald-400" },
     { id: "tiktok", name: "TikTok", icon: Play, color: "hover:text-sky-400" },
+    { id: "instagram", name: "Instagram", icon: Instagram, color: "hover:text-pink-400" },
   ];
 
   return (

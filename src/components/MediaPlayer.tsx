@@ -52,6 +52,24 @@ export function MediaPlayer({
 
   const activeElement = media?.type === "video" ? videoRef.current : audioRef.current;
 
+  // YT API Player Refs
+  const ytPlayerRef = useRef<any>(null);
+  const ytContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Load YouTube script on mount
+  useEffect(() => {
+    if (!(window as any).YT) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName("script")[0];
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        document.head.appendChild(tag);
+      }
+    }
+  }, []);
+
   // Sync state changes with the parent App component for the NowPlayingView
   useEffect(() => {
     if (onStateChange) {
@@ -71,6 +89,18 @@ export function MediaPlayer({
     if (registerControls) {
       registerControls({
         togglePlay: () => {
+          if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.getPlayerState === "function") {
+            const state = ytPlayerRef.current.getPlayerState();
+            if (state === 1) { // playing
+              ytPlayerRef.current.pauseVideo();
+              setIsPlaying(false);
+            } else {
+              ytPlayerRef.current.playVideo();
+              setIsPlaying(true);
+            }
+            return;
+          }
+
           if (!activeElement) return;
           if (isPlaying) {
             activeElement.pause();
@@ -82,6 +112,12 @@ export function MediaPlayer({
           }
         },
         seek: (time: number) => {
+          if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.seekTo === "function") {
+            ytPlayerRef.current.seekTo(time, true);
+            setCurrentTime(time);
+            return;
+          }
+
           if (activeElement) {
             activeElement.currentTime = time;
             setCurrentTime(time);
@@ -89,16 +125,41 @@ export function MediaPlayer({
         },
         setVolume: (vol: number) => {
           setVolume(vol);
+          setIsMuted(vol === 0);
+
+          if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === "function") {
+            ytPlayerRef.current.setVolume(vol * 100);
+            if (vol === 0) {
+              ytPlayerRef.current.mute();
+            } else {
+              ytPlayerRef.current.unmute();
+            }
+            return;
+          }
+
           if (activeElement) {
             activeElement.volume = vol;
             activeElement.muted = vol === 0;
           }
-          setIsMuted(vol === 0);
         },
         toggleMute: () => {
-          if (!activeElement) return;
           const nextMuted = !isMuted;
           setIsMuted(nextMuted);
+
+          if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.mute === "function") {
+            if (nextMuted) {
+              ytPlayerRef.current.mute();
+            } else {
+              ytPlayerRef.current.unmute();
+              if (volume === 0) {
+                setVolume(0.5);
+                ytPlayerRef.current.setVolume(50);
+              }
+            }
+            return;
+          }
+
+          if (!activeElement) return;
           activeElement.muted = nextMuted;
           if (!nextMuted && volume === 0) {
             setVolume(0.5);
@@ -107,7 +168,7 @@ export function MediaPlayer({
         }
       });
     }
-  }, [isPlaying, volume, isMuted, mediaUrl, registerControls, activeElement]);
+  }, [isPlaying, volume, isMuted, mediaUrl, registerControls, activeElement, media, isPlaying]);
 
   // Set selected quality if media options are available
   useEffect(() => {
@@ -127,6 +188,15 @@ export function MediaPlayer({
       setMediaUrl("");
       return;
     }
+    // If it is YouTube, we do not need custom direct stream extraction URLs
+    if (media.platform === "youtube") {
+      setMediaUrl("");
+      setIsMediaLoading(true);
+      setIsPlaying(false);
+      setCurrentTime(0);
+      return;
+    }
+
     let rawUrl = "";
     if (media.medias && media.medias.length > 0 && selectedQuality) {
       const option = media.medias.find(m => m.quality === selectedQuality);
@@ -151,7 +221,152 @@ export function MediaPlayer({
     setCurrentTime(0);
   }, [media, selectedQuality]);
 
-  // Auto play when source loads
+  // Initialize and recreate YT Player
+  useEffect(() => {
+    if (!media || media.platform !== "youtube") {
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.destroy();
+        } catch (e) {}
+        ytPlayerRef.current = null;
+      }
+      return;
+    }
+
+    let isDestroyed = false;
+    let pollInterval: any = null;
+
+    const initYTPlayer = () => {
+      if (isDestroyed || !ytContainerRef.current) return;
+
+      const YT = (window as any).YT;
+
+      // If there is already an active player and loadVideoById is available, reuse it
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.loadVideoById === "function") {
+        setIsMediaLoading(true);
+        setIsPlaying(false);
+        setCurrentTime(0);
+        try {
+          ytPlayerRef.current.loadVideoById({
+            videoId: media.id,
+            suggestedQuality: "default"
+          });
+        } catch (err) {
+          console.error("Failed loading video ID into existing YT player, re-creating:", err);
+          createNewPlayer(YT);
+        }
+        return;
+      }
+
+      createNewPlayer(YT);
+    };
+
+    const createNewPlayer = (YT: any) => {
+      if (!ytContainerRef.current) return;
+      
+      const playerDiv = document.createElement("div");
+      playerDiv.id = `yt-player-el-${Math.random().toString(36).substr(2, 9)}`;
+      ytContainerRef.current.innerHTML = "";
+      ytContainerRef.current.appendChild(playerDiv);
+
+      try {
+        ytPlayerRef.current = new YT.Player(playerDiv.id, {
+          videoId: media.id,
+          height: "100%",
+          width: "100%",
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            rel: 0,
+            modestbranding: 1,
+            origin: window.location.origin
+          },
+          events: {
+            onReady: (event: any) => {
+              if (isDestroyed) return;
+              setIsMediaLoading(false);
+              event.target.setVolume(volume * 100);
+              if (isMuted) {
+                event.target.mute();
+              } else {
+                event.target.unmute();
+              }
+              event.target.playVideo();
+              setDuration(event.target.getDuration() || 0);
+            },
+            onStateChange: (event: any) => {
+              if (isDestroyed) return;
+              // Player states: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
+              if (event.data === YT.PlayerState.PLAYING) {
+                setIsPlaying(true);
+                setIsMediaLoading(false);
+                setDuration(event.target.getDuration() || 0);
+              } else if (event.data === YT.PlayerState.PAUSED) {
+                setIsPlaying(false);
+              } else if (event.data === YT.PlayerState.BUFFERING) {
+                setIsMediaLoading(true);
+              } else if (event.data === YT.PlayerState.ENDED) {
+                setIsPlaying(false);
+                if (isAutoplayEnabled) {
+                  onPlayNext();
+                }
+              }
+            },
+            onError: (event: any) => {
+              if (isDestroyed) return;
+              setIsMediaLoading(false);
+              console.error("YouTube Player API Error:", event.data);
+              // Fallback: Skip if error playing
+              if (isAutoplayEnabled) {
+                onPlayNext();
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to create YT player:", err);
+      }
+    };
+
+    const checkAndInit = () => {
+      const YT = (window as any).YT;
+      if (YT && YT.Player) {
+        initYTPlayer();
+      } else {
+        pollInterval = setInterval(() => {
+          const innerYT = (window as any).YT;
+          if (innerYT && innerYT.Player) {
+            clearInterval(pollInterval);
+            initYTPlayer();
+          }
+        }, 100);
+      }
+    };
+
+    checkAndInit();
+
+    return () => {
+      isDestroyed = true;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [media?.id]);
+
+  // Poll current time for YouTube player progress bar
+  useEffect(() => {
+    if (!isPlaying || !media || media.platform !== "youtube" || !ytPlayerRef.current) return;
+
+    const interval = setInterval(() => {
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.getCurrentTime === "function") {
+        setCurrentTime(ytPlayerRef.current.getCurrentTime());
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, media?.id]);
+
+  // Auto play when source loads (for non-YouTube HTML5 players)
   const handleCanPlay = () => {
     setIsMediaLoading(false);
     if (activeElement) {
@@ -162,6 +377,18 @@ export function MediaPlayer({
   };
 
   const handlePlayPause = () => {
+    if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.getPlayerState === "function") {
+      const state = ytPlayerRef.current.getPlayerState();
+      if (state === 1) { // playing
+        ytPlayerRef.current.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        ytPlayerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+      return;
+    }
+
     if (!activeElement) return;
     if (isPlaying) {
       activeElement.pause();
@@ -187,6 +414,12 @@ export function MediaPlayer({
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
+    if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.seekTo === "function") {
+      ytPlayerRef.current.seekTo(val, true);
+      setCurrentTime(val);
+      return;
+    }
+
     if (activeElement) {
       activeElement.currentTime = val;
       setCurrentTime(val);
@@ -196,17 +429,38 @@ export function MediaPlayer({
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setVolume(val);
+    setIsMuted(val === 0);
+
+    if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === "function") {
+      ytPlayerRef.current.setVolume(val * 100);
+      ytPlayerRef.current.setMuted(val === 0);
+      return;
+    }
+
     if (activeElement) {
       activeElement.volume = val;
       activeElement.muted = val === 0;
     }
-    setIsMuted(val === 0);
   };
 
   const handleMuteToggle = () => {
-    if (!activeElement) return;
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
+
+    if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.mute === "function") {
+      if (nextMuted) {
+        ytPlayerRef.current.mute();
+      } else {
+        ytPlayerRef.current.unmute();
+        if (volume === 0) {
+          setVolume(0.5);
+          ytPlayerRef.current.setVolume(50);
+        }
+      }
+      return;
+    }
+
+    if (!activeElement) return;
     activeElement.muted = nextMuted;
     if (!nextMuted && volume === 0) {
       setVolume(0.5);
@@ -245,11 +499,13 @@ export function MediaPlayer({
   return (
     <div id="global-floating-player" className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/90 border-t border-white/5 backdrop-blur-xl shadow-2xl p-4 md:p-6 transition-all duration-300">
       {/* Hidden Players */}
-      {media.type === "video" ? (
+      {media.platform === "youtube" ? (
+        <div ref={ytContainerRef} className="hidden" />
+      ) : media.type === "video" ? (
         <video
           ref={videoRef}
           src={mediaUrl || undefined}
-          crossOrigin={media.platform === "youtube" ? undefined : "anonymous"}
+          crossOrigin="anonymous"
           className="hidden"
           onCanPlay={handleCanPlay}
           onTimeUpdate={handleTimeUpdate}
@@ -261,7 +517,7 @@ export function MediaPlayer({
         <audio
           ref={audioRef}
           src={mediaUrl || undefined}
-          crossOrigin={media.platform === "youtube" ? undefined : "anonymous"}
+          crossOrigin="anonymous"
           className="hidden"
           onCanPlay={handleCanPlay}
           onTimeUpdate={handleTimeUpdate}

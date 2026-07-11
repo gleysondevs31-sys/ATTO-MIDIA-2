@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Star, LayoutGrid, Heart, Music, Play, Youtube, Trash2, Search, Film } from "lucide-react";
+import { Star, LayoutGrid, Heart, Music, Play, Youtube, Trash2, Search, Film, Instagram } from "lucide-react";
 import { NormalizedMedia } from "../types";
 
 interface FavoritesViewProps {
@@ -23,9 +23,8 @@ export function FavoritesView({
   const platforms = [
     { id: "all", name: "Todos", icon: LayoutGrid },
     { id: "youtube", name: "YouTube", icon: Youtube },
-    { id: "soundcloud", name: "Soundcloud", icon: Music },
-    { id: "spotify", name: "Spotify", icon: Music },
     { id: "tiktok", name: "TikTok", icon: Play },
+    { id: "instagram", name: "Instagram", icon: Instagram },
   ];
 
   // Apply filters

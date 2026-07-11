@@ -8,7 +8,7 @@ import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
 
 interface ProviderDownloaderProps {
-  provider: "youtube" | "tiktok" | "instagram" | "spotify" | "soundcloud";
+  provider: "youtube" | "tiktok" | "instagram";
   onSearch: (q: string, isUrl: boolean) => void;
   isLoading: boolean;
   results: any[];
@@ -35,13 +35,18 @@ export function ProviderDownloader({
       title: "YouTube Video & MP3 Downloader",
       subtitle: "O melhor concorrente do Y2Mate e SaveTube. Baixe vídeos em MP4 HD e converta para áudio MP3 de alta fidelidade instantaneamente.",
       placeholder: "Cole um link do YouTube aqui (ex: https://www.youtube.com/watch?v=...) ou pesquise por palavras-chave...",
-      colorClass: "from-red-500 to-red-600",
+      colorClass: "from-red-600 to-rose-700",
       accentBg: "bg-red-500/10 border-red-500/20 text-red-500",
       textAccent: "text-red-500",
       icon: Youtube,
+      themeBg: "bg-[#0b0303]/90 border-red-900/10",
+      btnClass: "from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-900/20",
+      brandName: "YouTube Downloader Premium",
+      badgeText: "Campanha YouTube Ad-Ready",
       faq: [
-        { q: "Como converter vídeos do YouTube para MP3?", a: "Cole o link do vídeo, clique em 'Baixar' e selecione a opção de extração de Áudio MP3 para processar e baixar em poucos segundos." },
-        { q: "Existe limite de tamanho ou quantidade de downloads?", a: "Não! O ATTO YouTube Downloader é 100% ilimitado e gratuito para todos os usuários." }
+        { q: "Como converter vídeos do YouTube para MP3?", a: "Cole o link do vídeo do YouTube, clique em 'Baixar' e selecione a opção de extração de Áudio MP3 para processar e baixar em poucos segundos." },
+        { q: "Existe limite de tamanho ou quantidade de downloads?", a: "Não! O ATTO YouTube Downloader é 100% ilimitado e gratuito para todos os usuários." },
+        { q: "Quais formatos são aceitos?", a: "Extraímos tanto áudios em formato MP3 (alta fidelidade 320kbps) quanto vídeos MP4 em qualidade Full HD 1080p." }
       ],
       features: ["Conversão MP3 de alta densidade", "Download de vídeos em Full HD 1080p", "Processamento instantâneo via proxy seguro"]
     },
@@ -49,57 +54,39 @@ export function ProviderDownloader({
       title: "TikTok Downloader Sem Marca d'Água",
       subtitle: "A alternativa perfeita ao TikTokDL e Snaptik. Salve qualquer vídeo do TikTok em formato MP4 limpo, sem marcas d'água no rolo da sua câmera.",
       placeholder: "Cole o link do vídeo do TikTok aqui (ex: https://vm.tiktok.com/...) ou pesquise pelo nome...",
-      colorClass: "from-teal-500 to-teal-600",
-      accentBg: "bg-teal-500/10 border-teal-500/20 text-teal-500",
-      textAccent: "text-teal-500",
+      colorClass: "from-cyan-500 via-teal-500 to-pink-500",
+      accentBg: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400",
+      textAccent: "text-cyan-400",
       icon: Play,
+      themeBg: "bg-[#02090c]/95 border-cyan-950/20",
+      btnClass: "from-cyan-500 via-teal-500 to-pink-500 hover:brightness-110 shadow-cyan-950/20",
+      brandName: "TikTok No-Watermark Downloader",
+      badgeText: "Campanha TikTok Ad-Ready",
       faq: [
         { q: "Os vídeos baixados possuem perda de qualidade?", a: "Não, nosso extrator baixa o arquivo MP4 diretamente dos servidores CDN originais do TikTok com a resolução máxima original." },
-        { q: "Funciona no celular ou tablet?", a: "Sim! Nosso site é totalmente responsivo e funciona perfeitamente em dispositivos Android e iOS." }
+        { q: "Funciona no celular ou tablet?", a: "Sim! Nosso site é totalmente responsivo e funciona perfeitamente em dispositivos Android e iOS." },
+        { q: "Precisa de login ou senha?", a: "Não! O download é totalmente anônimo e você não precisa fazer login na sua conta do TikTok." }
       ],
       features: ["Remoção completa de marca d'água", "Download rápido em formato MP4", "Download de faixas de música em áudio MP3"]
     },
     instagram: {
       title: "Instagram Downloader (Reels, Vídeos & Fotos)",
       subtitle: "O concorrente definitivo do SaveInsta e SnapInsta. Baixe Reels, postagens de vídeo e fotos do Instagram diretamente para o seu aparelho de forma anônima.",
-      placeholder: "Cole um link de Reel, Vídeo ou Foto do Instagram aqui...",
-      colorClass: "from-pink-500 to-orange-500",
+      placeholder: "Cole um link de Reel, Vídeo ou Foto do Instagram aqui (ex: https://www.instagram.com/reel/...) ...",
+      colorClass: "from-purple-600 via-pink-500 to-yellow-500",
       accentBg: "bg-pink-500/10 border-pink-500/20 text-pink-500",
       textAccent: "text-pink-500",
       icon: Instagram,
+      themeBg: "bg-[#0e040c]/90 border-pink-900/10",
+      btnClass: "from-purple-600 via-pink-500 to-yellow-500 hover:brightness-110 shadow-pink-950/20",
+      brandName: "Instagram Reels & Photo Downloader",
+      badgeText: "Campanha Instagram Ad-Ready",
       faq: [
         { q: "Posso baixar Reels do Instagram de forma anônima?", a: "Sim, todos os downloads são feitos através dos nossos servidores de proxy e não expõem seu perfil ou dados." },
-        { q: "Como obter o link de um post do Instagram?", a: "Abra o aplicativo, clique no botão 'Compartilhar' (ícone de avião de papel) no post e selecione 'Copiar Link'." }
+        { q: "Como obter o link de um post do Instagram?", a: "Abra o aplicativo, clique no botão 'Compartilhar' (ícone de avião de papel) no post e selecione 'Copiar Link'." },
+        { q: "Funciona para posts de carrossel?", a: "Sim! Nosso sistema analisa posts de múltiplas fotos/vídeos e permite baixar cada item individualmente." }
       ],
       features: ["Download de Reels em alta velocidade", "Imagens e fotos na resolução máxima original", "Acesso anônimo e sem anúncios invasivos"]
-    },
-    spotify: {
-      title: "Spotify Music Downloader & Streamer",
-      subtitle: "Baixe músicas, faixas e álbuns inteiros do Spotify convertidos diretamente para MP3 em 320kbps de forma totalmente gratuita.",
-      placeholder: "Cole o link de uma música ou álbum do Spotify aqui...",
-      colorClass: "from-emerald-500 to-emerald-600",
-      accentBg: "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
-      textAccent: "text-emerald-500",
-      icon: Music,
-      faq: [
-        { q: "As músicas baixadas incluem metadados (capa, título, autor)?", a: "Sim, nosso sistema busca automaticamente todos os metadados e os incorpora diretamente no arquivo MP3 gerado." },
-        { q: "É necessário ter uma conta Spotify Premium?", a: "Não! Você não precisa de nenhuma conta premium do Spotify para reproduzir ou baixar músicas usando o ATTO." }
-      ],
-      features: ["Conversão direta para MP3 320kbps", "Download de capas de álbuns em alta qualidade", "Player interativo com streaming instantâneo"]
-    },
-    soundcloud: {
-      title: "SoundCloud High-Quality Downloader",
-      subtitle: "Converta e baixe faixas do SoundCloud em áudio MP3 em alta fidelidade. O melhor concorrente do SCDownloader online.",
-      placeholder: "Cole o link de uma faixa ou playlist do SoundCloud aqui...",
-      colorClass: "from-orange-500 to-amber-500",
-      accentBg: "bg-orange-500/10 border-orange-500/20 text-orange-500",
-      textAccent: "text-orange-500",
-      icon: Music,
-      faq: [
-        { q: "Como baixar uma música do SoundCloud?", a: "Copie a URL da faixa no SoundCloud, cole na caixa de busca acima e clique no botão de download para processar." },
-        { q: "O download de playlists é suportado?", a: "Atualmente, você pode baixar faixas individuais em alta velocidade. Suporte a playlists completas em breve." }
-      ],
-      features: ["Áudio nativo em 320kbps ou AAC", "Metadados sincronizados e integrados", "Servidor de proxy dedicado sem limites de rede"]
     }
   };
 
@@ -114,8 +101,6 @@ export function ProviderDownloader({
                     queryStr.startsWith("https://") || 
                     queryStr.includes("youtube.com") || 
                     queryStr.includes("youtu.be") || 
-                    queryStr.includes("spotify.com") || 
-                    queryStr.includes("soundcloud.com") || 
                     queryStr.includes("tiktok.com") ||
                     queryStr.includes("instagram.com");
       onSearch(queryStr, isUrl);

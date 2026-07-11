@@ -75,6 +75,17 @@
   --color-dark-bg: var(--bg-main);
   --color-dark-surface: var(--bg-surface);
   --color-dark-card: var(--bg-card);
+
+  --animate-shimmer: shimmer 2s infinite linear;
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }
 
 @layer base {

@@ -18,7 +18,6 @@ export function AudioEqualizer({ audioRef, videoRef, activeType, disabled }: Aud
   
   // Audio context and nodes
   const ctxRef = useRef<AudioContext | null>(null);
-  const sourceNodesRef = useRef<{ audio?: MediaElementAudioSourceNode, video?: MediaElementAudioSourceNode }>({});
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const preampRef = useRef<GainNode | null>(null);
   const isInitialized = useRef(false);
@@ -56,45 +55,42 @@ export function AudioEqualizer({ audioRef, videoRef, activeType, disabled }: Aud
       filters[filters.length - 1].connect(ctx.destination);
       
       filtersRef.current = filters;
-
-      // Connect elements if they exist
-      if (audioRef?.current && !sourceNodesRef.current.audio) {
-        audioRef.current.crossOrigin = "anonymous";
-        const source = ctx.createMediaElementSource(audioRef.current);
-        source.connect(preampNode);
-        sourceNodesRef.current.audio = source;
-      }
-      
-      if (videoRef?.current && !sourceNodesRef.current.video) {
-        videoRef.current.crossOrigin = "anonymous";
-        const source = ctx.createMediaElementSource(videoRef.current);
-        source.connect(preampNode);
-        sourceNodesRef.current.video = source;
-      }
-      
       isInitialized.current = true;
     } catch (e) {
       console.error("Error initializing audio context for equalizer", e);
     }
   };
 
-  // Ensure element is connected if type switches and wasn't connected yet
+  // Ensure elements are connected to the AudioContext when it is initialized and not disabled.
+  // Using custom properties on the HTMLMediaElement itself guarantees that we never double-connect
+  // the same DOM node to a MediaElementAudioSourceNode (which would throw a native exception).
   useEffect(() => {
-    if (disabled) return;
-    if (isInitialized.current && ctxRef.current && preampRef.current) {
-      const activeEl = activeType === "audio" ? audioRef?.current : videoRef?.current;
-      if (activeEl && !sourceNodesRef.current[activeType]) {
-        activeEl.crossOrigin = "anonymous";
-        try {
-          const source = ctxRef.current.createMediaElementSource(activeEl);
-          source.connect(preampRef.current);
-          sourceNodesRef.current[activeType] = source;
-        } catch (e) {
-          console.error("Error connecting new media element", e);
-        }
+    if (disabled || !isInitialized.current || !ctxRef.current || !preampRef.current) return;
+
+    const connectElement = (el: HTMLAudioElement | HTMLVideoElement | null) => {
+      if (!el) return;
+      if ((el as any).__connectedToEQ) {
+        return;
       }
-    }
-  }, [activeType, audioRef, videoRef]);
+
+      try {
+        console.log("[AudioEqualizer] Robustly connecting media element to equalizer:", el.tagName);
+        const source = ctxRef.current!.createMediaElementSource(el);
+        source.connect(preampRef.current!);
+        (el as any).__connectedToEQ = true;
+
+        if (ctxRef.current && ctxRef.current.state === "suspended") {
+          ctxRef.current.resume();
+        }
+      } catch (e) {
+        console.error("[AudioEqualizer] Error connecting element to Web Audio graph:", e);
+      }
+    };
+
+    if (audioRef?.current) connectElement(audioRef.current);
+    if (videoRef?.current) connectElement(videoRef.current);
+
+  }, [disabled, audioRef?.current, videoRef?.current, activeType, isOpen]);
 
   // Handle open
   const toggleOpen = () => {

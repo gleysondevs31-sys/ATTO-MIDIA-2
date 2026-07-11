@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { 
   Sparkles, Play, Flame, Compass, Heart, Shield, Database, Download, 
   Music, ArrowRight, Video, List, Check, Search, Link, Cpu, HelpCircle, 
-  TrendingUp, Globe, AlertTriangle, ArrowUpRight, Zap, Sun, Moon
+  TrendingUp, Globe, AlertTriangle, ArrowUpRight, Zap, Sun, Moon, Youtube, Instagram
 } from "lucide-react";
 import { AttoLogo } from "./AttoLogo";
 
@@ -15,6 +15,7 @@ interface LandingPageProps {
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onSelectView?: (view: string) => void;
+  onSelectPlatform?: (platform: string) => void;
 }
 
 export function LandingPage({ 
@@ -25,7 +26,8 @@ export function LandingPage({
   onSearch,
   theme,
   onToggleTheme,
-  onSelectView
+  onSelectView,
+  onSelectPlatform
 }: LandingPageProps) {
   const [searchValue, setSearchValue] = useState("");
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -62,7 +64,7 @@ export function LandingPage({
     },
     {
       q: "Quais formatos e resoluções de download estão disponíveis?",
-      a: "Para mídias de vídeo (YouTube/TikTok), oferecemos downloads diretos em alta definição MP4. Para mídias de áudio (SoundCloud/Spotify), nosso sistema extrai e converte a faixa para MP3 ou AAC em alta fidelidade."
+      a: "Para mídias de vídeo (YouTube/TikTok/Instagram Reels), oferecemos downloads diretos em alta definição MP4. Para mídias de áudio (YouTube Music), nosso sistema extrai e converte a faixa para MP3 em alta fidelidade."
     }
   ];
 
@@ -70,7 +72,7 @@ export function LandingPage({
     {
       step: "01",
       title: "Pesquise ou Cole o Link",
-      desc: "Digite termos de busca ou cole URLs diretas do YouTube, TikTok, Spotify ou SoundCloud.",
+      desc: "Digite termos de busca ou cole URLs diretas do YouTube, TikTok ou Instagram.",
       color: "from-rose-500 to-rose-600"
     },
     {
@@ -183,7 +185,7 @@ export function LandingPage({
 
           {/* Subtitle Description */}
           <p className="text-zinc-400 text-sm md:text-base max-w-2xl mt-6 leading-relaxed font-sans">
-            Pesquise, assista, transmita e faça downloads instantâneos do <strong>YouTube</strong>, <strong>SoundCloud</strong>, <strong>Spotify</strong> e <strong>TikTok (sem marca d'água)</strong>. Sem anúncios abusivos, rápido e 100% gratuito.
+            Pesquise, assista, transmita e faça downloads instantâneos do <strong>YouTube</strong>, <strong>Instagram (Reels e Fotos)</strong> e <strong>TikTok (sem marca d'água)</strong>. Sem anúncios abusivos, rápido e 100% gratuito.
           </p>
 
           {/* INTERACTIVE SEARCH AND PASTE BAR */}
@@ -193,7 +195,7 @@ export function LandingPage({
                 <Search className="w-5 h-5 text-zinc-500 flex-shrink-0" />
                 <input
                   type="text"
-                  placeholder="Pesquise por música/vídeo ou cole um link do YouTube, TikTok, Spotify..."
+                  placeholder="Pesquise por música/vídeo ou cole um link do YouTube, TikTok, Instagram..."
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   className="w-full bg-transparent text-white placeholder-zinc-500 text-sm outline-none border-none py-1"
@@ -254,9 +256,15 @@ export function LandingPage({
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             
-            <div className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-red-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-red-950/5 transition-all duration-300 group">
+            <div 
+              onClick={() => {
+                onSelectPlatform?.("youtube");
+                onEnterApp();
+              }}
+              className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-red-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-red-950/5 transition-all duration-300 group cursor-pointer active:scale-98 hover:scale-[1.02] hover:shadow-xl hover:shadow-red-950/5 text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
-                <Music className="w-5 h-5" />
+                <Youtube className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-white mt-4 font-display">YouTube Player</h4>
               <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
@@ -267,20 +275,32 @@ export function LandingPage({
               </div>
             </div>
 
-            <div className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-emerald-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-emerald-950/5 transition-all duration-300 group">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
-                <Music className="w-5 h-5" />
+            <div 
+              onClick={() => {
+                onSelectPlatform?.("instagram");
+                onEnterApp();
+              }}
+              className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-pink-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-pink-950/5 transition-all duration-300 group cursor-pointer active:scale-98 hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-950/5 text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500 group-hover:scale-110 transition-transform">
+                <Instagram className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white mt-4 font-display">Spotify Premium API</h4>
+              <h4 className="text-sm font-bold text-white mt-4 font-display">Instagram Reels</h4>
               <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-                Reprodutor de áudio integrado com suporte a streaming proxy para escutar suas músicas prediletas.
+                Baixe Reels, fotos de posts e carrosséis com segurança de forma totalmente anônima.
               </p>
-              <div className="mt-3 inline-flex items-center gap-1 text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
-                ● STREAMING ONLINE
+              <div className="mt-3 inline-flex items-center gap-1 text-[9px] font-mono font-bold text-pink-400 bg-pink-500/5 px-2 py-0.5 rounded border border-pink-500/10">
+                ● DOWNLOAD DE REELS
               </div>
             </div>
 
-            <div className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-amber-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-amber-950/5 transition-all duration-300 group">
+            <div 
+              onClick={() => {
+                onSelectPlatform?.("tiktok");
+                onEnterApp();
+              }}
+              className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-amber-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-amber-950/5 transition-all duration-300 group cursor-pointer active:scale-98 hover:scale-[1.02] hover:shadow-xl hover:shadow-amber-950/5 text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
                 <Play className="w-5 h-5" />
               </div>
@@ -293,16 +313,22 @@ export function LandingPage({
               </div>
             </div>
 
-            <div className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-sky-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-sky-950/5 transition-all duration-300 group">
+            <div 
+              onClick={() => {
+                onSelectPlatform?.("all");
+                onEnterApp();
+              }}
+              className="p-6 rounded-3xl bg-[#090909] border border-white/5 hover:border-sky-500/20 hover:bg-gradient-to-b hover:from-[#0c0c0c] hover:to-sky-950/5 transition-all duration-300 group cursor-pointer active:scale-98 hover:scale-[1.02] hover:shadow-xl hover:shadow-sky-950/5 text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500 group-hover:scale-110 transition-transform">
                 <Globe className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white mt-4 font-display">SoundCloud Hub</h4>
+              <h4 className="text-sm font-bold text-white mt-4 font-display">Proxy Ultrarrápido</h4>
               <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-                Acesse o catálogo do SoundCloud com navegação de metadados completa e downloads diretos de faixas de música.
+                Toda transferência passa pelos nossos servidores de alto desempenho, garantindo alta velocidade de download.
               </p>
               <div className="mt-3 inline-flex items-center gap-1 text-[9px] font-mono font-bold text-sky-400 bg-sky-500/5 px-2 py-0.5 rounded border border-sky-500/10">
-                ● INTEGRADO
+                ● PROXIED
               </div>
             </div>
 
@@ -499,7 +525,7 @@ export function LandingPage({
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                    <span>Acesso total ao SoundCloud & Spotify</span>
+                    <span>Acesso ilimitado a todos os downloaders</span>
                   </li>
                 </ul>
               </div>
@@ -629,7 +655,7 @@ export function LandingPage({
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
-                A melhor e mais rápida plataforma online para pesquisar, reproduzir, converter e baixar vídeos ou áudios do YouTube, TikTok, Spotify e SoundCloud de forma totalmente gratuita e segura.
+                A melhor e mais rápida plataforma online para pesquisar, reproduzir, converter e baixar vídeos ou áudios do YouTube, TikTok e Instagram de forma totalmente gratuita e segura.
               </p>
               <div className="text-[10px] font-mono font-bold text-zinc-500">
                 PROXIED VIA ATTO CORE API v2.4
@@ -659,7 +685,7 @@ export function LandingPage({
                 </li>
                 <li>
                   <button onClick={onEnterApp} className="hover:text-primary transition-colors cursor-pointer text-left">
-                    Streaming Spotify & SoundCloud
+                    Instagram Reels & Posts
                   </button>
                 </li>
               </ul>
