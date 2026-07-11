@@ -120,6 +120,20 @@ export function MediaPlayer({
     if (!(window as any).YT) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
+      tag.onerror = () => {
+        console.warn("YouTube standard iframe_api failed (possibly SSL/Cert issue), trying nocookie...");
+        const fallbackTag = document.createElement("script");
+        fallbackTag.src = "https://www.youtube-nocookie.com/iframe_api";
+        fallbackTag.onerror = () => {
+          console.error("Both YouTube iframe API URLs failed to load.");
+        };
+        const firstScript = document.getElementsByTagName("script")[0];
+        if (firstScript && firstScript.parentNode) {
+          firstScript.parentNode.insertBefore(fallbackTag, firstScript);
+        } else {
+          document.head.appendChild(fallbackTag);
+        }
+      };
       const firstScriptTag = document.getElementsByTagName("script")[0];
       if (firstScriptTag && firstScriptTag.parentNode) {
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
@@ -395,11 +409,18 @@ export function MediaPlayer({
       if (YT && YT.Player) {
         initYTPlayer();
       } else {
+        let attempts = 0;
         pollInterval = setInterval(() => {
+          attempts++;
           const innerYT = (window as any).YT;
           if (innerYT && innerYT.Player) {
             clearInterval(pollInterval);
             initYTPlayer();
+          } else if (attempts >= 50) { // 5 seconds
+            clearInterval(pollInterval);
+            setIsMediaLoading(false);
+            toast.error("Erro no Player", "Não foi possível carregar o reprodutor do YouTube (Erro de SSL/Rede). Tente abrir em uma nova aba.");
+            console.error("YouTube iframe API load timeout.");
           }
         }, 100);
       }
