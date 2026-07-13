@@ -22,11 +22,13 @@ async function run() {
     // Set a normal user agent to look like a real browser
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
-    console.log("[Cookies Setup] Navigating to YouTube...");
+    console.log("[Cookies Setup] Navigating to YouTube Home...");
     await page.goto("https://www.youtube.com", { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Wait a couple of seconds to make sure cookies are fully registered
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log("[Cookies Setup] Navigating to a YouTube video page to trigger player/visitor validation...");
+    await page.goto("https://www.youtube.com/watch?v=JV_et_kRpLU", { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 4000));
 
     console.log("[Cookies Setup] Extracting cookies...");
     const cookies = await page.cookies();

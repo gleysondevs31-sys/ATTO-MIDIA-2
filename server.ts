@@ -13,6 +13,31 @@ import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 import { sendEmail } from "./src/mailer.ts";
 import { PlayEngine } from "@irithell-js/yt-play";
 
+// Ensure executable permissions for @irithell-js/yt-play binaries and prepend paths to PATH
+const ytPlayBinDir = path.join(process.cwd(), "node_modules", "@irithell-js", "yt-play", "bin");
+const binaries = ["yt-dlp", "deno", "aria2c"];
+binaries.forEach(binName => {
+  const binPath = path.join(ytPlayBinDir, binName);
+  if (fs.existsSync(binPath)) {
+    try {
+      fs.chmodSync(binPath, "755");
+      console.log(`[YouTube Setup] Set executable permissions for ${binName}`);
+    } catch (e) {
+      console.warn(`[YouTube Setup] Failed to set permissions for ${binName}:`, e);
+    }
+  }
+});
+
+const customBinPath = path.join(process.cwd(), "bin");
+let paths = process.env.PATH ? process.env.PATH.split(":") : [];
+if (!paths.includes(ytPlayBinDir)) {
+  paths.unshift(ytPlayBinDir);
+}
+if (!paths.includes(customBinPath)) {
+  paths.unshift(customBinPath);
+}
+process.env.PATH = paths.join(":");
+
 // Load environment variables
 dotenv.config();
 
@@ -78,6 +103,7 @@ console.log(`[YouTube Setup] Initializing PlayEngine. cookiesPath=${cookiesPath}
 const playEngine = new PlayEngine({
   useAria2c: true,
   cookiesPath: hasCookies ? cookiesPath : undefined,
+  playerClient: "ios",
   logger: customPlayLogger,
 });
 
@@ -3210,6 +3236,101 @@ app.post("/api/user/api-key/regenerate", authenticateToken, async (req, res) => 
   }
 });
 
+// Helper to resolve media URL details for any platform
+async function resolvePlatformUrl(url: string): Promise<{
+  title: string;
+  author: string;
+  thumbnail: string;
+  platform: string;
+  type: "video" | "audio";
+  playableVideoUrl: string | null;
+  playableAudioUrl: string | null;
+  originalUrl: string;
+} | null> {
+  const lowerUrl = url.toLowerCase();
+  
+  // 1. YouTube
+  if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) {
+    try {
+      const ytDetails = await fetchYouTubeInfo(url);
+      if (ytDetails) {
+        return {
+          title: ytDetails.title || "YouTube Video",
+          author: ytDetails.author || "YouTube Creator",
+          thumbnail: ytDetails.thumbnail || "",
+          platform: "youtube",
+          type: "video",
+          playableVideoUrl: `/api/media/yt-download?type=video&url=${encodeURIComponent(url)}`,
+          playableAudioUrl: `/api/media/yt-download?type=audio&url=${encodeURIComponent(url)}`,
+          originalUrl: url
+        };
+      }
+    } catch (err: any) {
+      console.warn("[resolvePlatformUrl] YouTube failed:", err.message);
+    }
+  }
+
+  // 2. TikTok
+  if (lowerUrl.includes("tiktok.com")) {
+    try {
+      const ttDetails = await fetchTikTokDetails(url);
+      if (ttDetails) {
+        return {
+          title: ttDetails.title || "TikTok Video",
+          author: ttDetails.author || "TikTok User",
+          thumbnail: ttDetails.thumbnail || "",
+          platform: "tiktok",
+          type: "video",
+          playableVideoUrl: ttDetails.playableVideoUrl,
+          playableAudioUrl: ttDetails.playableAudioUrl,
+          originalUrl: url
+        };
+      }
+    } catch (err: any) {
+      console.warn("[resolvePlatformUrl] TikTok details failed:", err.message);
+    }
+  }
+
+  // 4. Fallback (Instagram or other supported via ZeroTwo)
+  try {
+    const rawData = await fetchFromZeroTwo("/api/dl/multidl", { url });
+    if (rawData && rawData.resultado) {
+      const resObj = rawData.resultado;
+      const source = (resObj.source || "unknown").toLowerCase();
+      const platform = source.includes("youtube") ? "youtube" : source.includes("tiktok") ? "tiktok" : source.includes("instagram") ? "instagram" : source;
+      
+      let playableVideoUrl = resObj.url || null;
+      let playableAudioUrl = null;
+
+      if (platform === "youtube") {
+        playableVideoUrl = `/api/media/yt-download?type=video&url=${encodeURIComponent(resObj.url || url)}`;
+        playableAudioUrl = `/api/media/yt-download?type=audio&url=${encodeURIComponent(resObj.url || url)}`;
+      } else if (platform === "tiktok") {
+        playableVideoUrl = resObj.no_watermark || resObj.watermark || null;
+        playableAudioUrl = resObj.music || null;
+      } else if (platform === "instagram") {
+        playableVideoUrl = resObj.url || (resObj.medias?.find((m: any) => m.type === "video")?.url) || null;
+        playableAudioUrl = resObj.music || (resObj.medias?.find((m: any) => m.type === "audio")?.url) || null;
+      }
+
+      return {
+        title: resObj.title || "Mídia Resolvida",
+        author: resObj.author || "Autor Desconhecido",
+        thumbnail: resObj.thumbnail || "",
+        platform,
+        type: "video",
+        playableVideoUrl,
+        playableAudioUrl,
+        originalUrl: url
+      };
+    }
+  } catch (err: any) {
+    console.error("[resolvePlatformUrl] ZeroTwo fallback failed:", err.message);
+  }
+
+  return null;
+}
+
 // Developer API: Search YouTube
 app.get("/api/v1/search", authenticateApiKey, async (req, res) => {
   const query = req.query.q;
@@ -3226,61 +3347,148 @@ app.get("/api/v1/search", authenticateApiKey, async (req, res) => {
   }
 });
 
-// Developer API: Stream Download
-app.get("/api/v1/download", authenticateApiKey, async (req, res) => {
-  const { type, url } = req.query;
-  if (!url) {
+// Developer API: Resolve URL (YouTube, TikTok, Instagram)
+app.get("/api/v1/resolve", authenticateApiKey, async (req, res) => {
+  const url = req.query.url;
+  if (!url || typeof url !== "string") {
     return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
   }
 
-  const cleanMediaUrl = cleanUrl(url as string);
-  const user = (req as any).apiUser;
+  try {
+    const resolved = await resolvePlatformUrl(url);
+    if (!resolved) {
+      return res.status(404).json({ error: "Não foi possível resolver a URL fornecida." });
+    }
+    return res.json({ status: true, resolved });
+  } catch (err: any) {
+    console.error("[API v1 Resolve Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao resolver detalhes da URL de mídia", details: err.message });
+  }
+});
 
-  console.log(`[API v1 Download] Request by user "${user?.username || "API_User"}" - type=${type} url=${cleanMediaUrl}`);
-  addYtPlayLog("info", `[API v1] Request from user "${user?.username}" for type="${type}" with url="${cleanMediaUrl}"`);
+// Developer API: Universal Stream Download (YouTube, TikTok, Instagram, etc.)
+app.get("/api/v1/download", authenticateApiKey, async (req, res) => {
+  const { type, url } = req.query;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
+  }
+
+  const cleanMediaUrl = cleanUrl(url);
+  const user = (req as any).apiUser;
+  const downloadType = type === "video" ? "video" : "audio";
+
+  console.log(`[API v1 Download] Request by user "${user?.username || "API_User"}" - type=${downloadType} url=${cleanMediaUrl}`);
+  addYtPlayLog("info", `[API v1] Request from user "${user?.username}" for type="${downloadType}" with url="${cleanMediaUrl}"`);
+
+  // Detect direct YouTube URLs
+  const isYt = cleanMediaUrl.includes("youtube.com") || cleanMediaUrl.includes("youtu.be");
 
   try {
-    if (type === "video") {
-      addYtPlayLog("info", `[API v1] Calling playEngine.stream.getVideoStream("${cleanMediaUrl}")`);
-      const streamInfo = await playEngine.stream.getVideoStream(cleanMediaUrl);
-      
-      res.setHeader("content-type", "video/mp4");
+    if (isYt) {
+      if (downloadType === "video") {
+        addYtPlayLog("info", `[API v1] Calling playEngine.stream.getVideoStream("${cleanMediaUrl}")`);
+        const streamInfo = await playEngine.stream.getVideoStream(cleanMediaUrl);
+        
+        res.setHeader("content-type", "video/mp4");
+        res.setHeader("access-control-allow-origin", "*");
+        
+        streamInfo.stream.pipe(res);
+        return;
+      } else {
+        addYtPlayLog("info", `[API v1] Calling playEngine.stream.getAudioStream("${cleanMediaUrl}")`);
+        const streamInfo = await playEngine.stream.getAudioStream(cleanMediaUrl);
+        
+        res.setHeader("content-type", "audio/mpeg");
+        res.setHeader("access-control-allow-origin", "*");
+        
+        streamInfo.stream.pipe(res);
+        return;
+      }
+    }
+
+    // Resolve non-YouTube URLs (TikTok, Instagram, etc.)
+    const resolved = await resolvePlatformUrl(cleanMediaUrl);
+    if (!resolved) {
+      return res.status(404).json({ error: "Não foi possível resolver a URL de mídia fornecida." });
+    }
+
+    // YouTube resolved links
+    if (resolved.platform === "youtube") {
+      let ytUrl = resolved.originalUrl;
+
+      if (downloadType === "video") {
+        addYtPlayLog("info", `[API v1] YT resolved. Calling playEngine.stream.getVideoStream("${ytUrl}")`);
+        const streamInfo = await playEngine.stream.getVideoStream(ytUrl);
+        res.setHeader("content-type", "video/mp4");
+        res.setHeader("access-control-allow-origin", "*");
+        streamInfo.stream.pipe(res);
+        return;
+      } else {
+        addYtPlayLog("info", `[API v1] YT resolved. Calling playEngine.stream.getAudioStream("${ytUrl}")`);
+        const streamInfo = await playEngine.stream.getAudioStream(ytUrl);
+        res.setHeader("content-type", "audio/mpeg");
+        res.setHeader("access-control-allow-origin", "*");
+        streamInfo.stream.pipe(res);
+        return;
+      }
+    }
+
+    // For TikTok, Instagram, etc.
+    const targetUrl = downloadType === "video" ? resolved.playableVideoUrl : resolved.playableAudioUrl;
+    if (!targetUrl) {
+      return res.status(404).json({ error: `Nenhum stream de ${downloadType} disponível para esta mídia.` });
+    }
+
+    console.log(`[API v1 Download] Streaming resolved URL: ${targetUrl}`);
+    addYtPlayLog("info", `[API v1] Streaming resolved URL: ${targetUrl}`);
+
+    try {
+      const cacheResult = await getOrDownloadMedia(targetUrl);
+      res.setHeader("content-type", cacheResult.contentType);
       res.setHeader("access-control-allow-origin", "*");
+      return res.sendFile(cacheResult.filePath);
+    } catch (cacheErr: any) {
+      console.warn(`[API v1 Download] Cache stream failed, using direct fetch for: ${targetUrl}`, cacheErr.message);
       
-      streamInfo.stream.on("end", () => {
-        console.log(`[API v1] Video stream completed for ${cleanMediaUrl}`);
-        addYtPlayLog("info", `[API v1] Video stream completed for ${cleanMediaUrl}`);
-      });
-      streamInfo.stream.on("error", (streamErr: any) => {
-        console.error(`[API v1] Error during video piping:`, streamErr);
-        addYtPlayLog("error", `[API v1] Error piping video for ${cleanMediaUrl}:`, streamErr);
-      });
+      const headers: Record<string, string> = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+      };
+      if (cleanMediaUrl.includes("tiktok")) headers["Referer"] = "https://www.tiktok.com/";
+      if (cleanMediaUrl.includes("instagram")) headers["Referer"] = "https://www.instagram.com/";
+
+      const response = await fetch(targetUrl, { headers });
+      const contentType = response.headers.get("content-type") || (downloadType === "video" ? "video/mp4" : "audio/mpeg");
+      res.setHeader("content-type", contentType);
       
-      streamInfo.stream.pipe(res);
-      return;
-    } else {
-      addYtPlayLog("info", `[API v1] Calling playEngine.stream.getAudioStream("${cleanMediaUrl}")`);
-      const streamInfo = await playEngine.stream.getAudioStream(cleanMediaUrl);
-      
-      res.setHeader("content-type", "audio/mpeg");
+      const contentLength = response.headers.get("content-length");
+      if (contentLength) {
+        res.setHeader("content-length", contentLength);
+      } else {
+        res.setHeader("transfer-encoding", "chunked");
+      }
       res.setHeader("access-control-allow-origin", "*");
-      
-      streamInfo.stream.on("end", () => {
-        console.log(`[API v1] Audio stream completed for ${cleanMediaUrl}`);
-        addYtPlayLog("info", `[API v1] Audio stream completed for ${cleanMediaUrl}`);
-      });
-      streamInfo.stream.on("error", (streamErr: any) => {
-        console.error(`[API v1] Error during audio piping:`, streamErr);
-        addYtPlayLog("error", `[API v1] Error piping audio for ${cleanMediaUrl}:`, streamErr);
-      });
-      
-      streamInfo.stream.pipe(res);
-      return;
+
+      if (response.body) {
+        if (typeof (response.body as any).getReader === "function") {
+          const reader = (response.body as any).getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+        } else {
+          for await (const chunk of response.body as any) {
+            res.write(chunk);
+          }
+        }
+      }
+      res.end();
     }
   } catch (err: any) {
-    console.error(`[API v1] PlayEngine failed:`, err);
-    addYtPlayLog("error", `[API v1] PlayEngine failed for ${cleanMediaUrl}:`, err);
-    res.status(500).json({ error: "Falha ao resolver streaming de mídia no yt-play", details: err.message });
+    console.error(`[API v1] PlayEngine/Resolution failed:`, err);
+    addYtPlayLog("error", `[API v1] PlayEngine/Resolution failed for ${cleanMediaUrl}:`, err);
+    res.status(500).json({ error: "Falha ao baixar/transmitir mídia", details: err.message });
   }
 });
 

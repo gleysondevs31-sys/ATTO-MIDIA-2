@@ -22,7 +22,7 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
   const [copiedSearchCurl, setCopiedSearchCurl] = useState<boolean>(false);
 
   // Playground - Download State
-  const [downloadUrl, setDownloadUrl] = useState<string>("https://www.youtube.com/watch?v=jfKfPfyJRdk");
+  const [downloadUrl, setDownloadUrl] = useState<string>("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   const [downloadType, setDownloadType] = useState<"audio" | "video">("audio");
   const [copiedDownloadUrl, setCopiedDownloadUrl] = useState<boolean>(false);
 
@@ -174,7 +174,7 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
             Integre Downloads ao seu App
           </h2>
           <p className="text-sm text-zinc-400 max-w-xl leading-relaxed">
-            Utilize nosso robusto mecanismo <code className="text-emerald-400 font-mono bg-emerald-500/5 px-1.5 py-0.5 rounded">playEngine</code> via endpoints HTTPS de alta velocidade para buscar, reproduzir e baixar mídias do YouTube programaticamente.
+            Utilize nosso robusto mecanismo multi-plataforma via endpoints HTTPS de alta velocidade para buscar, reproduzir, e baixar mídias do <b>YouTube, TikTok e Instagram</b> programaticamente.
           </p>
         </div>
         <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 animate-pulse shrink-0">
@@ -457,7 +457,7 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
                 /api/v1/download
               </span>
               <span className="text-zinc-500 text-xs hidden sm:inline">&mdash;</span>
-              <span className="text-xs text-zinc-400">Pipa e transmite o stream de mídia (MP3 ou MP4) diretamente</span>
+              <span className="text-xs text-zinc-400">Pipa e transmite o stream de mídia (YouTube, TikTok, Instagram) diretamente</span>
             </div>
             <span className="text-[10px] font-mono text-zinc-500">
               Autenticado: apikey
@@ -515,13 +515,13 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-mono">
                     <span className="text-zinc-300 font-bold">url <span className="text-rose-500">*</span></span>
-                    <span className="text-zinc-500">URL do YouTube</span>
+                    <span className="text-zinc-500">URL de Mídia (YT, TikTok, Instagram)</span>
                   </div>
                   <input
                     type="text"
                     value={downloadUrl}
                     onChange={(e) => setDownloadUrl(e.target.value)}
-                    placeholder="Cole um link do YouTube..."
+                    placeholder="Cole um link do YouTube, TikTok ou Instagram..."
                     className="w-full px-3.5 py-2.5 bg-[#080808] border border-white/5 focus:border-emerald-500/20 focus:outline-none rounded-xl text-xs font-mono text-white"
                   />
                 </div>
@@ -579,6 +579,66 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
                   Ao realizar a requisição, nossa API não redireciona ou entrega links de expiração curta. Ela realiza o bypass das restrições de IP de forma nativa e entrega os bytes da mídia sob demanda (<code className="text-white font-mono bg-white/5 px-1 py-0.5 rounded">res.pipe()</code>) diretamente para seu cliente, garantindo estabilidade e permitindo downloads de qualquer lugar do mundo.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ENDPOINT 3: Resolve Metadata and Playable Links */}
+        <div className="bg-[#111111]/80 border border-white/5 rounded-2xl overflow-hidden shadow-md">
+          <div className="p-5 bg-zinc-900/45 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-3 py-1 bg-sky-500/10 border border-sky-500/25 text-[10px] font-mono font-bold text-sky-400 rounded-lg">
+                GET
+              </span>
+              <span className="font-mono text-xs text-zinc-300 font-bold">
+                /api/v1/resolve
+              </span>
+              <span className="text-zinc-500 text-xs hidden sm:inline">&mdash;</span>
+              <span className="text-xs text-zinc-400">Resolve metadados, capas e links de stream sob demanda de qualquer link</span>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500">
+              Autenticado: apikey
+            </span>
+          </div>
+
+          <div className="p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div className="xl:col-span-5 space-y-4">
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Parâmetros</h4>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-300 font-bold">url <span className="text-rose-500">*</span></span>
+                    <span className="text-zinc-500">Link do YouTube, TikTok ou Instagram</span>
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    value="https://www.instagram.com/p/..."
+                    className="w-full px-3.5 py-2.5 bg-[#080808] border border-white/5 rounded-xl text-xs font-mono text-zinc-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="xl:col-span-7 space-y-3">
+              <span className="text-xs font-mono font-bold text-zinc-400 flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-zinc-500" /> Resposta em formato JSON
+              </span>
+              <pre className="p-4 bg-[#050505] border border-white/5 rounded-xl text-[10px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
+{`{
+  "status": true,
+  "resolved": {
+    "title": "Mídia Exemplo",
+    "author": "Criador Original",
+    "thumbnail": "https://...",
+    "platform": "instagram",
+    "type": "video",
+    "playableVideoUrl": "https://...",
+    "playableAudioUrl": "https://...",
+    "originalUrl": "https://www.instagram.com/p/..."
+  }
+}`}
+              </pre>
             </div>
           </div>
         </div>
