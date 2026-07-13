@@ -421,9 +421,19 @@ export function VideoPlayerPage({
     setVolume(val);
     setIsMuted(val === 0);
 
-    if (activeMedia?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === "function") {
-      ytPlayerRef.current.setVolume(val * 100);
-      ytPlayerRef.current.setMuted(val === 0);
+    if (activeMedia?.platform === "youtube" && ytPlayerRef.current) {
+      if (typeof ytPlayerRef.current.setVolume === "function") {
+        ytPlayerRef.current.setVolume(val * 100);
+      }
+      if (val === 0) {
+        if (typeof ytPlayerRef.current.mute === "function") {
+          ytPlayerRef.current.mute();
+        }
+      } else {
+        if (typeof ytPlayerRef.current.unMute === "function") {
+          ytPlayerRef.current.unMute();
+        }
+      }
       return;
     }
 

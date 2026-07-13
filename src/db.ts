@@ -55,6 +55,7 @@ export async function bootstrapDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS api_key VARCHAR(255) UNIQUE;
     `);
     console.log("[DB] 'users' table verified/created.");
 
@@ -174,7 +175,12 @@ export async function bootstrapDatabase() {
         SET primary_api_url = REPLACE(primary_api_url, '.com.br', '.store'),
             fallback_api_url = REPLACE(fallback_api_url, '.com.br', '.store')
       `);
-      console.log("[DB] Existing YouTube config checked and updated if necessary.");
+      await client.query(`
+        UPDATE platforms_config
+        SET is_enabled = FALSE
+        WHERE platform_key IN ('soundcloud', 'spotify')
+      `);
+      console.log("[DB] Existing YouTube config checked and updated. Soundcloud and Spotify disabled.");
     }
 
     console.log("[DB] Database auto-bootstrap completed successfully!");

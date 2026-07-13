@@ -1,5 +1,5 @@
 import React from "react";
-import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram, Sparkles } from "lucide-react";
+import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram, Sparkles, Code2 } from "lucide-react";
 import { AttoLogo } from "./AttoLogo";
 
 interface SidebarProps {
@@ -188,6 +188,20 @@ export function Sidebar({
             >
               <Shield className="w-4 h-4 text-zinc-400" />
               <span>Termos & Ajuda</span>
+            </button>
+
+            {/* Documentação API */}
+            <button
+              id="btn-nav-api-docs"
+              onClick={() => handleSelectNav("api-docs")}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "api-docs"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Code2 className="w-4 h-4 text-emerald-400" />
+              <span>Documentação API</span>
             </button>
 
             {/* Admin panel */}

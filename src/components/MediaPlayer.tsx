@@ -512,9 +512,19 @@ export function MediaPlayer({
     setVolume(val);
     setIsMuted(val === 0);
 
-    if (media?.platform === "youtube" && ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === "function") {
-      ytPlayerRef.current.setVolume(val * 100);
-      ytPlayerRef.current.setMuted(val === 0);
+    if (media?.platform === "youtube" && ytPlayerRef.current) {
+      if (typeof ytPlayerRef.current.setVolume === "function") {
+        ytPlayerRef.current.setVolume(val * 100);
+      }
+      if (val === 0) {
+        if (typeof ytPlayerRef.current.mute === "function") {
+          ytPlayerRef.current.mute();
+        }
+      } else {
+        if (typeof ytPlayerRef.current.unMute === "function") {
+          ytPlayerRef.current.unMute();
+        }
+      }
       return;
     }
 
@@ -608,10 +618,19 @@ export function MediaPlayer({
         />
       )}
 
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-6 justify-between">
+      {/* Progress Timeline for Mobile (super slim progress indicator at the very top edge of player container) */}
+      <div className="md:hidden absolute top-0 left-0 right-0 h-0.5 bg-white/10 overflow-hidden">
+        <div 
+          className="bg-[#f43f5e] h-full transition-all duration-300"
+          style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+        />
+      </div>
+
+      {/* Desktop Layout (Hidden on mobile) */}
+      <div className="hidden md:flex max-w-7xl mx-auto flex-row items-center gap-6 justify-between">
         
         {/* Left Section: Media Info */}
-        <div className="flex items-center gap-4 w-full md:w-1/4 min-w-0">
+        <div className="flex items-center gap-4 w-1/4 min-w-0">
           <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-black flex-shrink-0 border border-white/5 shadow-md">
             {media.thumbnail ? (
               <img 
@@ -661,7 +680,7 @@ export function MediaPlayer({
         </div>
 
         {/* Center Section: Playback Controls */}
-        <div className="flex-1 w-full max-w-xl flex flex-col gap-2">
+        <div className="flex-1 max-w-xl flex flex-col gap-2">
           {/* Controls row */}
           <div className="flex items-center justify-center gap-4">
             {/* Play/Pause */}
@@ -719,7 +738,7 @@ export function MediaPlayer({
         </div>
 
         {/* Right Section: Volume & Utilities */}
-        <div className="w-full md:w-1/4 flex items-center justify-end gap-4 flex-wrap md:flex-nowrap">
+        <div className="w-1/4 flex items-center justify-end gap-4">
           {/* Quality Selector (YouTube only) */}
           {hasQualities && (
             <div className="flex items-center gap-1 bg-[#111111] border border-white/5 rounded-lg px-2 py-1">
@@ -806,6 +825,85 @@ export function MediaPlayer({
           </button>
         </div>
 
+      </div>
+
+      {/* Mobile Layout (Sleek, slim & premium) */}
+      <div className="flex md:hidden items-center justify-between w-full gap-3 pt-1">
+        {/* Left Section: Info (opens full screen detail view on tap) */}
+        <div 
+          onClick={() => onSelectView && onSelectView("now-playing")}
+          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+        >
+          <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-black flex-shrink-0 border border-white/5 shadow-md">
+            {media.thumbnail ? (
+              <img 
+                src={media.thumbnail || undefined} 
+                alt={media.title} 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-600">
+                <Music className="w-4 h-4" />
+              </div>
+            )}
+            
+            {/* Loading Spinner */}
+            {isMediaLoading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h5 className="font-display font-semibold text-xs text-gray-100 truncate">
+              {media.title}
+            </h5>
+            <p className="text-[10px] text-gray-400 truncate">
+              {media.author}
+            </p>
+          </div>
+        </div>
+
+        {/* Right Section: Compact Controls */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Play/Pause */}
+          <button
+            onClick={handlePlayPause}
+            disabled={isMediaLoading}
+            className={`p-2 rounded-full text-zinc-950 shadow-sm transition-all ${
+              isMediaLoading 
+                ? "bg-[#111111] text-gray-600" 
+                : "bg-white hover:bg-gray-150 active:scale-95"
+            }`}
+          >
+            {isPlaying ? (
+              <Pause className="w-4 h-4 fill-zinc-950" />
+            ) : (
+              <Play className="w-4 h-4 fill-zinc-950 ml-0.5" />
+            )}
+          </button>
+
+          {/* Skip Next */}
+          <button
+            onClick={onPlayNext}
+            disabled={isMediaLoading}
+            className="p-2 rounded-full bg-[#111111] border border-white/5 text-gray-300 hover:text-white active:scale-95"
+            title="Próxima Faixa"
+          >
+            <SkipForward className="w-3.5 h-3.5 fill-current" />
+          </button>
+
+          {/* Close Player */}
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-[#111111] border border-white/5 text-gray-500 hover:text-white"
+            title="Fechar Reprodutor"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );

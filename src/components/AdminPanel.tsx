@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Users, Database, Star, Search, Shield, Settings, Trash2, Edit3, Key, Clock, Sparkles, RefreshCw, BarChart2, ListTodo, Check, X, AlertTriangle, ShieldCheck, Heart, Megaphone, CreditCard } from "lucide-react";
 import * as Lucide from "lucide-react";
+import { DebugConsole } from "./DebugConsole";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 
 interface UserAdminRow {
@@ -49,6 +50,7 @@ interface AdminPanelProps {
 
 export function AdminPanel({ token, currentUser, customPlatforms = [], onRefreshPlatforms }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<"stats" | "users" | "logs" | "platforms" | "giftcards" | "banners" | "diagnostics" | "setup">("stats");
+  const [isYtPlayConsoleEnabled, setIsYtPlayConsoleEnabled] = useState(false);
   const [users, setUsers] = useState<UserAdminRow[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [logs, setLogs] = useState<ActivityLogs | null>(null);
@@ -1713,6 +1715,60 @@ export function AdminPanel({ token, currentUser, customPlatforms = [], onRefresh
                     </details>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Debug Console section for yt-play */}
+          <div className="bg-[#111111]/50 border border-white/5 rounded-2xl p-6 shadow-sm mt-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div className="space-y-1">
+                <h5 className="font-mono font-bold text-sm text-white flex items-center gap-2">
+                  <Lucide.Terminal className="w-4 h-4 text-emerald-500" />
+                  Monitor do PlayEngine (yt-play)
+                </h5>
+                <p className="text-xs text-zinc-500">
+                  Monitore erros e logs gerados pela biblioteca yt-play em tempo real para controle de erros de download.
+                </p>
+              </div>
+              
+              {/* Toggle Switch */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-zinc-400">
+                  {isYtPlayConsoleEnabled ? "Exibindo Console" : "Console Oculto"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsYtPlayConsoleEnabled(!isYtPlayConsoleEnabled)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-[#111111] ${
+                    isYtPlayConsoleEnabled ? "bg-emerald-500" : "bg-zinc-700"
+                  }`}
+                  role="switch"
+                  aria-checked={isYtPlayConsoleEnabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      isYtPlayConsoleEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {isYtPlayConsoleEnabled ? (
+              <div className="transition-all duration-300">
+                <DebugConsole token={token} />
+              </div>
+            ) : (
+              <div className="bg-[#050505] border border-dashed border-white/5 p-8 rounded-2xl flex flex-col items-center text-center justify-center space-y-3">
+                <Lucide.EyeOff className="w-8 h-8 text-zinc-600" />
+                <div>
+                  <p className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">Console de Logs Desativado</p>
+                  <p className="text-[11px] text-zinc-500 mt-1 max-w-sm">
+                    Ative a chave de monitoramento acima para visualizar em tempo real o console de logs da biblioteca yt-play e depurar erros de download.
+                  </p>
+                </div>
               </div>
             )}
           </div>

@@ -11,9 +11,75 @@ import { pool, bootstrapDatabase } from "./src/db.ts";
 import ytSearch from "yt-search";
 import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 import { sendEmail } from "./src/mailer.ts";
+import { PlayEngine } from "@irithell-js/yt-play";
 
 // Load environment variables
 dotenv.config();
+
+interface YtPlayLog {
+  timestamp: string;
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
+}
+
+const ytPlayLogs: YtPlayLog[] = [];
+const MAX_YT_PLAY_LOGS = 1000;
+
+function addYtPlayLog(level: "info" | "warn" | "error" | "debug", ...args: any[]) {
+  const message = args.map(arg => {
+    if (arg && typeof arg === "object") {
+      try {
+        if (arg instanceof Error) {
+          return arg.stack || arg.message;
+        }
+        return JSON.stringify(arg);
+      } catch (e) {
+        return String(arg);
+      }
+    }
+    return String(arg);
+  }).join(" ");
+  
+  ytPlayLogs.push({
+    timestamp: new Date().toISOString(),
+    level,
+    message
+  });
+  
+  if (ytPlayLogs.length > MAX_YT_PLAY_LOGS) {
+    ytPlayLogs.shift();
+  }
+}
+
+// Create a comprehensive logger for PlayEngine to monitor everything it does and capture all errors
+const customPlayLogger = {
+  info: (...args: any[]) => {
+    console.log("[yt-play INFO]", ...args);
+    addYtPlayLog("info", ...args);
+  },
+  warn: (...args: any[]) => {
+    console.warn("[yt-play WARN]", ...args);
+    addYtPlayLog("warn", ...args);
+  },
+  error: (...args: any[]) => {
+    console.error("[yt-play ERROR]", ...args);
+    addYtPlayLog("error", ...args);
+  },
+  debug: (...args: any[]) => {
+    console.log("[yt-play DEBUG]", ...args);
+    addYtPlayLog("debug", ...args);
+  },
+};
+
+// Initialize PlayEngine for YouTube downloading/streaming using browser cookies
+const cookiesPath = path.join(process.cwd(), "cookies.txt");
+const hasCookies = fs.existsSync(cookiesPath);
+console.log(`[YouTube Setup] Initializing PlayEngine. cookiesPath=${cookiesPath} (exists=${hasCookies})`);
+const playEngine = new PlayEngine({
+  useAria2c: true,
+  cookiesPath: hasCookies ? cookiesPath : undefined,
+  logger: customPlayLogger,
+});
 
 // Config MercadoPago
 const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-4691327005261909-070108-11a727d082a2d8674da55f802d11f53a-543280425';
@@ -247,6 +313,8 @@ async function checkPlatformAvailability(req: express.Request, res: express.Resp
       if (platformKey === "all" || !platformKey) {
         return next(); // "all" will handle individual platform checks internally if needed, or we just let it pass
       }
+    } else if (req.path === "/media/details") {
+      platformKey = (req.query.platform as string || "").toLowerCase();
     } else if (req.path === "/media/by-url" && req.body.url) {
       const url = req.body.url.toLowerCase();
       if (url.includes("youtube.com") || url.includes("youtu.be")) platformKey = "youtube";
@@ -774,7 +842,15 @@ app.get("/api/search", async (req, res) => {
     }
 
     // 2. Soundcloud Search
-    if (platform === "soundcloud" || platform === "all") {
+    let isSoundcloudEnabled = false;
+    try {
+      const scConfig = await getPlatformConfig("soundcloud");
+      isSoundcloudEnabled = scConfig ? scConfig.is_enabled !== false : false;
+    } catch (e) {
+      isSoundcloudEnabled = false;
+    }
+
+    if (isSoundcloudEnabled && (platform === "soundcloud" || platform === "all")) {
       try {
         const scData = await fetchFromPlatform("soundcloud", "/api/soundcloud/search", { query });
         if (scData && scData.status && Array.isArray(scData.resultado)) {
@@ -802,8 +878,16 @@ app.get("/api/search", async (req, res) => {
       }
     }
 
-    // 3. Spotify Search
-    if (platform === "spotify" || platform === "all") {
+    // 3. Spotify Search (Only if enabled in platforms_config)
+    let isSpotifyEnabled = false;
+    try {
+      const spotConfig = await getPlatformConfig("spotify");
+      isSpotifyEnabled = spotConfig ? spotConfig.is_enabled !== false : false;
+    } catch (e) {
+      isSpotifyEnabled = false;
+    }
+
+    if (isSpotifyEnabled && (platform === "spotify" || platform === "all")) {
       try {
         const spotData = await fetchFromPlatform("spotify", "/api/spotify/search", { q: query, type: "track", limit: "15" });
         if (spotData && spotData.status && Array.isArray(spotData.resultado)) {
@@ -977,6 +1061,21 @@ app.get("/api/media/details", async (req, res) => {
         console.error("Soundcloud details error:", err.message);
       }
     } else if (platform === "spotify") {
+      let isSpotifyEnabled = false;
+      try {
+        const config = await getPlatformConfig("spotify");
+        isSpotifyEnabled = config ? config.is_enabled !== false : false;
+      } catch (e) {
+        isSpotifyEnabled = false;
+      }
+      if (!isSpotifyEnabled) {
+        console.warn("[Spotify Details] Spotify is disabled. Returning placeholder metadata.");
+        return res.status(503).json({ 
+          status: false, 
+          error: "A plataforma Spotify está desativada nas configurações." 
+        });
+      }
+
       try {
         const spotData = await fetchFromPlatform("spotify", "/api/spotify/search", { q: id, type: "track", limit: "1" });
         if (spotData && spotData.status && Array.isArray(spotData.resultado) && spotData.resultado.length > 0) {
@@ -1101,39 +1200,82 @@ app.get("/api/media/resolve", async (req, res) => {
       }
     }
 
-    // If it's spotify, resolve using Soundcloud search matching
+    // If it's spotify, resolve using YouTube search matching (Spotify API is disabled/retired)
     if (platform === "spotify" || url.includes("spotify.com")) {
       let searchTitle = url;
       if (url.includes("spotify.com/track/")) {
-        const trackId = url.split("/track/")[1]?.split("?")[0];
         try {
-          const spotData = await fetchFromZeroTwo("/api/spotify/search", { q: trackId, type: "track", limit: "1" });
-          if (spotData && spotData.status && Array.isArray(spotData.resultado) && spotData.resultado.length > 0) {
-            const item = spotData.resultado[0];
-            searchTitle = `${item.trackArtist} - ${item.name}`;
+          console.log(`[Spotify Resolve] Fetching Spotify page directly to avoid external API calls: ${url}`);
+          const response = await fetch(url, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8"
+            }
+          });
+          if (response.ok) {
+            const html = await response.text();
+            
+            // Extract the og:title metadata
+            const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) ||
+                                 html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']/i);
+            const ogDescriptionMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i) ||
+                                       html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:description["']/i);
+            
+            if (ogTitleMatch && ogTitleMatch[1]) {
+              const songTitle = ogTitleMatch[1];
+              let artist = "Spotify Artist";
+              if (ogDescriptionMatch && ogDescriptionMatch[1]) {
+                const desc = ogDescriptionMatch[1];
+                const parts = desc.split(" · ");
+                if (parts.length > 1) {
+                  artist = parts[0].replace(/^Listen to\s+/i, "").trim();
+                }
+              }
+              searchTitle = `${artist} - ${songTitle}`;
+              console.log(`[Spotify Resolve] Successfully parsed page metadata: "${searchTitle}"`);
+            } else {
+              const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+              if (titleMatch && titleMatch[1]) {
+                searchTitle = titleMatch[1].replace(/\s*\|\s*Spotify\s*$/i, "").trim();
+                console.log(`[Spotify Resolve] Parsed fallback page title: "${searchTitle}"`);
+              }
+            }
+          } else {
+            console.warn(`[Spotify Resolve] Failed to fetch Spotify page (status ${response.status}). Using URL as query.`);
           }
-        } catch (e) {
-          console.error("Error fetching Spotify track during resolve:", e);
+        } catch (e: any) {
+          console.error("[Spotify Resolve] Error reading Spotify HTML directly:", e.message);
         }
       }
 
-      const scData = await fetchFromZeroTwo("/api/soundcloud/search", { query: searchTitle });
-      if (scData && scData.status && Array.isArray(scData.resultado) && scData.resultado.length > 0) {
-        const bestMatch = scData.resultado[0];
-        return res.json({
-          status: true,
-          resolved: {
-            playableAudioUrl: bestMatch._media?.transcodings?.[0]?.url || null,
-            title: bestMatch.title,
-            author: bestMatch.user?.username || "Soundcloud Artist",
-            thumbnail: bestMatch.artwork_url || "https://img.freepik.com/premium-vector/soundcloud-logo_578229-284.jpg",
-            duration: formatMillis(bestMatch.duration),
-            originalUrl: url,
-            platform: "spotify",
-            type: "audio"
-          }
-        });
+      try {
+        const ytItems = await searchYouTube(searchTitle);
+        if (ytItems && ytItems.length > 0) {
+          const bestMatch = ytItems[0];
+          return res.json({
+            status: true,
+            resolved: {
+              playableAudioUrl: `/api/media/yt-download?type=audio&url=${encodeURIComponent(bestMatch.url)}`,
+              playableVideoUrl: `/api/media/yt-download?type=video&url=${encodeURIComponent(bestMatch.url)}`,
+              title: bestMatch.title,
+              author: bestMatch.author || "YouTube Creator",
+              thumbnail: bestMatch.thumbnail,
+              duration: bestMatch.duration,
+              originalUrl: url,
+              platform: "spotify",
+              type: "audio"
+            }
+          });
+        }
+      } catch (err: any) {
+        console.error("Error resolving Spotify track via YouTube search:", err.message);
       }
+
+      return res.status(404).json({
+        status: false,
+        error: "Não foi possível encontrar a faixa correspondente no YouTube.",
+        code: "SPOTIFY_RESOLVE_FAILED"
+      });
     }
 
     if (platform === "tiktok" || url.includes("tiktok.com")) {
@@ -1343,20 +1485,23 @@ app.get("/api/media/resolve-spotify", async (req, res) => {
     return res.status(400).json({ error: "Query is required" });
   }
   try {
-    const scData = await fetchFromZeroTwo("/api/soundcloud/search", { query });
-    if (scData && scData.status && Array.isArray(scData.resultado) && scData.resultado.length > 0) {
-      const bestMatch = scData.resultado[0];
+    console.log(`[Spotify Legacy Resolve] Resolving query "${query}" using searchYouTube to bypass Spotify/Soundcloud APIs.`);
+    const ytItems = await searchYouTube(query);
+    if (ytItems && ytItems.length > 0) {
+      const bestMatch = ytItems[0];
       return res.json({
         status: true,
-        playableAudioUrl: bestMatch._media?.transcodings?.[0]?.url || null,
+        playableAudioUrl: `/api/media/yt-download?type=audio&url=${encodeURIComponent(bestMatch.url)}`,
+        playableVideoUrl: `/api/media/yt-download?type=video&url=${encodeURIComponent(bestMatch.url)}`,
         title: bestMatch.title,
-        author: bestMatch.user?.username || "Soundcloud Artist",
-        thumbnail: bestMatch.artwork_url || "https://img.freepik.com/premium-vector/soundcloud-logo_578229-284.jpg"
+        author: bestMatch.author || "YouTube Creator",
+        thumbnail: bestMatch.thumbnail
       });
     }
-    res.status(404).json({ error: "Nenhum arquivo de áudio streamable correspondente encontrado." });
+    res.status(404).json({ error: "Nenhum arquivo de áudio correspondente encontrado no YouTube." });
   } catch (err: any) {
-    res.status(500).json({ error: "Erro ao resolver faixa de áudio", details: err.message });
+    console.error("[Spotify Legacy Resolve Error]", err.message);
+    res.status(500).json({ error: "Erro ao resolver faixa de áudio no YouTube", details: err.message });
   }
 });
 
@@ -1367,6 +1512,69 @@ app.get("/api/media/yt-download", async (req, res) => {
   }
 
   const cleanMediaUrl = cleanUrl(url as string);
+
+  // 1. Try using the newly integrated @irithell-js/yt-play module (with our Puppeteer-extracted browser cookies)
+  console.log(`[YouTube yt-play REQUEST] Starting stream resolution for type="${type}" with url="${cleanMediaUrl}"`);
+  addYtPlayLog("info", `Starting stream resolution for type="${type}" with url="${cleanMediaUrl}"`);
+  
+  const cookiesExist = fs.existsSync(path.join(process.cwd(), "cookies.txt"));
+  console.log(`[YouTube yt-play COOKIES] Using cookies.txt exists=${cookiesExist}`);
+  addYtPlayLog("debug", `Using cookies.txt exists=${cookiesExist}`);
+  
+  try {
+    if (type === "video") {
+      console.log(`[YouTube yt-play ACTION] Calling playEngine.stream.getVideoStream("${cleanMediaUrl}")`);
+      addYtPlayLog("info", `Calling playEngine.stream.getVideoStream("${cleanMediaUrl}")`);
+      const streamInfo = await playEngine.stream.getVideoStream(cleanMediaUrl);
+      console.log(`[YouTube yt-play SUCCESS] Obtained video stream. Quality="${streamInfo.quality}", Format="${streamInfo.format}"`);
+      addYtPlayLog("info", `Obtained video stream. Quality="${streamInfo.quality}", Format="${streamInfo.format}"`);
+      
+      res.setHeader("content-type", "video/mp4");
+      res.setHeader("access-control-allow-origin", "*");
+      
+      streamInfo.stream.on("data", (chunk: any) => {
+        // Log minimal chunk delivery info if needed, or just let it flow
+      });
+      streamInfo.stream.on("end", () => {
+        console.log(`[YouTube yt-play COMPLETED] Video stream piping completed for URL: ${cleanMediaUrl}`);
+        addYtPlayLog("info", `Video stream piping completed for URL: ${cleanMediaUrl}`);
+      });
+      streamInfo.stream.on("error", (streamErr: any) => {
+        console.error(`[YouTube yt-play STREAM ERROR] Error during video piping:`, streamErr);
+        addYtPlayLog("error", `Error during video piping for URL: ${cleanMediaUrl}`, streamErr);
+      });
+      
+      streamInfo.stream.pipe(res);
+      return;
+    } else {
+      console.log(`[YouTube yt-play ACTION] Calling playEngine.stream.getAudioStream("${cleanMediaUrl}")`);
+      addYtPlayLog("info", `Calling playEngine.stream.getAudioStream("${cleanMediaUrl}")`);
+      const streamInfo = await playEngine.stream.getAudioStream(cleanMediaUrl);
+      console.log(`[YouTube yt-play SUCCESS] Obtained audio stream. Quality="${streamInfo.quality}", Format="${streamInfo.format}"`);
+      addYtPlayLog("info", `Obtained audio stream. Quality="${streamInfo.quality}", Format="${streamInfo.format}"`);
+      
+      res.setHeader("content-type", "audio/mpeg");
+      res.setHeader("access-control-allow-origin", "*");
+      
+      streamInfo.stream.on("end", () => {
+        console.log(`[YouTube yt-play COMPLETED] Audio stream piping completed for URL: ${cleanMediaUrl}`);
+        addYtPlayLog("info", `Audio stream piping completed for URL: ${cleanMediaUrl}`);
+      });
+      streamInfo.stream.on("error", (streamErr: any) => {
+        console.error(`[YouTube yt-play STREAM ERROR] Error during audio piping:`, streamErr);
+        addYtPlayLog("error", `Error during audio piping for URL: ${cleanMediaUrl}`, streamErr);
+      });
+      
+      streamInfo.stream.pipe(res);
+      return;
+    }
+  } catch (err: any) {
+    console.error(`[YouTube yt-play ERROR] @irithell-js/yt-play failed with exception:`, err);
+    addYtPlayLog("error", `@irithell-js/yt-play failed with exception:`, err);
+    console.warn(`[YouTube yt-play FALLBACK] Falling back to legacy MultiDL zero-two endpoints...`);
+    addYtPlayLog("warn", `Falling back to legacy MultiDL zero-two endpoints...`);
+  }
+
   const base = YT_API_BASE_URL.endsWith("/") ? YT_API_BASE_URL.slice(0, -1) : YT_API_BASE_URL;
   
   let directMediaUrl: string | null = null;
@@ -2899,6 +3107,180 @@ app.delete("/api/admin/gift-cards/:id", authenticateToken, requireAdmin, async (
   } catch (err: any) {
     console.error("[Admin Delete Gift Card Error]:", err.message);
     return res.status(500).json({ error: "Erro ao remover gift card." });
+  }
+});
+
+app.get("/api/admin/yt-play/logs", authenticateToken, requireAdmin, (req, res) => {
+  return res.json({ status: true, logs: ytPlayLogs });
+});
+
+app.delete("/api/admin/yt-play/logs", authenticateToken, requireAdmin, (req, res) => {
+  ytPlayLogs.length = 0;
+  return res.json({ status: true, message: "Logs do yt-play limpos com sucesso!" });
+});
+
+// ==========================================
+// USER API KEYS & PUBLIC DEVELOPER ROUTES
+// ==========================================
+
+// Middleware to authenticate via API Key
+async function authenticateApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
+  let apiKey = req.query.apikey || req.headers["x-api-key"];
+  
+  if (!apiKey) {
+    const authHeader = req.headers["authorization"];
+    if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+      apiKey = authHeader.substring(7);
+    }
+  }
+
+  if (!apiKey || typeof apiKey !== "string") {
+    return res.status(401).json({ error: "API Key não fornecida. Passe via query (?apikey=...) ou cabeçalho 'X-API-Key'" });
+  }
+
+  try {
+    const userRes = await pool.query(
+      "SELECT id, username, email, role, plan FROM users WHERE api_key = $1",
+      [apiKey]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(401).json({ error: "API Key inválida ou inativa" });
+    }
+
+    (req as any).apiUser = userRes.rows[0];
+    next();
+  } catch (err: any) {
+    console.error("[API Key Auth Error]:", err.message);
+    return res.status(500).json({ error: "Erro de servidor ao autenticar API key" });
+  }
+}
+
+// Get or generate user API key
+app.get("/api/user/api-key", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    const userRes = await pool.query(
+      "SELECT api_key FROM users WHERE id = $1",
+      [authReq.user.id]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    let apiKey = userRes.rows[0].api_key;
+    if (!apiKey) {
+      apiKey = `zt_${crypto.randomBytes(24).toString("hex")}`;
+      await pool.query(
+        "UPDATE users SET api_key = $1 WHERE id = $2",
+        [apiKey, authReq.user.id]
+      );
+    }
+
+    return res.json({ status: true, apiKey });
+  } catch (err: any) {
+    console.error("[Get API Key Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao buscar ou gerar API key" });
+  }
+});
+
+// Regenerate user API key
+app.post("/api/user/api-key/regenerate", authenticateToken, async (req, res) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
+
+  try {
+    const newApiKey = `zt_${crypto.randomBytes(24).toString("hex")}`;
+    const result = await pool.query(
+      "UPDATE users SET api_key = $1 WHERE id = $2 RETURNING api_key",
+      [newApiKey, authReq.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    return res.json({ status: true, apiKey: result.rows[0].api_key, message: "Nova API key gerada com sucesso!" });
+  } catch (err: any) {
+    console.error("[Regenerate API Key Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao regenerar API key" });
+  }
+});
+
+// Developer API: Search YouTube
+app.get("/api/v1/search", authenticateApiKey, async (req, res) => {
+  const query = req.query.q;
+  if (!query || typeof query !== "string") {
+    return res.status(400).json({ error: "O parâmetro de busca 'q' é obrigatório." });
+  }
+
+  try {
+    const results = await searchYouTube(query);
+    return res.json({ status: true, resultsCount: results.length, results });
+  } catch (err: any) {
+    console.error("[API v1 Search Error]:", err.message);
+    return res.status(500).json({ error: "Erro ao realizar busca no YouTube", details: err.message });
+  }
+});
+
+// Developer API: Stream Download
+app.get("/api/v1/download", authenticateApiKey, async (req, res) => {
+  const { type, url } = req.query;
+  if (!url) {
+    return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
+  }
+
+  const cleanMediaUrl = cleanUrl(url as string);
+  const user = (req as any).apiUser;
+
+  console.log(`[API v1 Download] Request by user "${user?.username || "API_User"}" - type=${type} url=${cleanMediaUrl}`);
+  addYtPlayLog("info", `[API v1] Request from user "${user?.username}" for type="${type}" with url="${cleanMediaUrl}"`);
+
+  try {
+    if (type === "video") {
+      addYtPlayLog("info", `[API v1] Calling playEngine.stream.getVideoStream("${cleanMediaUrl}")`);
+      const streamInfo = await playEngine.stream.getVideoStream(cleanMediaUrl);
+      
+      res.setHeader("content-type", "video/mp4");
+      res.setHeader("access-control-allow-origin", "*");
+      
+      streamInfo.stream.on("end", () => {
+        console.log(`[API v1] Video stream completed for ${cleanMediaUrl}`);
+        addYtPlayLog("info", `[API v1] Video stream completed for ${cleanMediaUrl}`);
+      });
+      streamInfo.stream.on("error", (streamErr: any) => {
+        console.error(`[API v1] Error during video piping:`, streamErr);
+        addYtPlayLog("error", `[API v1] Error piping video for ${cleanMediaUrl}:`, streamErr);
+      });
+      
+      streamInfo.stream.pipe(res);
+      return;
+    } else {
+      addYtPlayLog("info", `[API v1] Calling playEngine.stream.getAudioStream("${cleanMediaUrl}")`);
+      const streamInfo = await playEngine.stream.getAudioStream(cleanMediaUrl);
+      
+      res.setHeader("content-type", "audio/mpeg");
+      res.setHeader("access-control-allow-origin", "*");
+      
+      streamInfo.stream.on("end", () => {
+        console.log(`[API v1] Audio stream completed for ${cleanMediaUrl}`);
+        addYtPlayLog("info", `[API v1] Audio stream completed for ${cleanMediaUrl}`);
+      });
+      streamInfo.stream.on("error", (streamErr: any) => {
+        console.error(`[API v1] Error during audio piping:`, streamErr);
+        addYtPlayLog("error", `[API v1] Error piping audio for ${cleanMediaUrl}:`, streamErr);
+      });
+      
+      streamInfo.stream.pipe(res);
+      return;
+    }
+  } catch (err: any) {
+    console.error(`[API v1] PlayEngine failed:`, err);
+    addYtPlayLog("error", `[API v1] PlayEngine failed for ${cleanMediaUrl}:`, err);
+    res.status(500).json({ error: "Falha ao resolver streaming de mídia no yt-play", details: err.message });
   }
 });
 

@@ -28,6 +28,7 @@ import { PlansView } from "./components/PlansView";
 import { ProviderDownloader } from "./components/ProviderDownloader";
 import { NowPlayingView } from "./components/NowPlayingView";
 import { BannerDisplay } from "./components/BannerDisplay";
+import { ApiDocsView } from "./components/ApiDocsView";
 
 export default function App() {
   const { toast } = useToast();
@@ -127,7 +128,7 @@ export default function App() {
 
   // Automatically close sidebar when transitioning to full-width/panel screens, or on mobile for any navigation
   useEffect(() => {
-    const isPanelScreen = ["admin", "profile", "plans", "legal"].includes(currentView);
+    const isPanelScreen = ["admin", "profile", "plans", "legal", "api-docs"].includes(currentView);
     if (isPanelScreen || window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
@@ -881,6 +882,12 @@ export default function App() {
             <LegalView
               onBackToExplore={() => setCurrentView("explore")}
               initialTab={legalTab}
+            />
+          ) : currentView === "api-docs" ? (
+            <ApiDocsView
+              user={user}
+              token={token}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
             />
           ) : currentView === "admin" && user && token ? (
             <AdminPanel
