@@ -131,12 +131,17 @@ export function ScrapersDocsView({ onBack }: { onBack?: () => void }) {
                 <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Testar na API</h4>
                 
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-mono text-zinc-400 mb-1">Método (se for classe/objeto)</label>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-zinc-300">
+                      Método do Scraper
+                      <span className="block text-[10px] font-normal text-zinc-500 mt-0.5">
+                        Selecione a funcionalidade que deseja testar (ex: buscar, baixar, listar).
+                      </span>
+                    </label>
                     <select
                       value={selectedMethod}
                       onChange={e => setSelectedMethod(e.target.value)}
-                      className="w-full px-3 py-2 bg-[#080808] border border-white/5 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-amber-500/50"
+                      className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                     >
                       <option value="">(Padrão / Nenhum)</option>
                       {selectedScraper.methods.map((m: string) => (
@@ -145,14 +150,19 @@ export function ScrapersDocsView({ onBack }: { onBack?: () => void }) {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-mono text-zinc-400 mb-1">Argumentos (JSON array ou texto)</label>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-zinc-300">
+                      Parâmetros do Scraper
+                      <span className="block text-[10px] font-normal text-zinc-500 mt-0.5">
+                        Exemplo: insira a URL do vídeo ou perfil que deseja baixar/extrair.
+                      </span>
+                    </label>
                     <textarea
                       value={argsInput}
                       onChange={e => setArgsInput(e.target.value)}
-                      placeholder='["https://..."] ou "texto simples"'
+                      placeholder='Ex: ["https://tiktok.com/@user/video/123"] ou "texto de busca"'
                       rows={3}
-                      className="w-full px-3 py-2 bg-[#080808] border border-white/5 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-amber-500/50 resize-none font-mono"
+                      className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-emerald-500/50 resize-none transition-colors"
                     />
                   </div>
 

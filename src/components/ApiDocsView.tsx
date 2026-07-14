@@ -24,6 +24,7 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
   // Playground - Download State
   const [downloadUrl, setDownloadUrl] = useState<string>("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   const [downloadType, setDownloadType] = useState<"audio" | "video">("audio");
+  const [downloadFormat, setDownloadFormat] = useState<string>("");
   const [copiedDownloadUrl, setCopiedDownloadUrl] = useState<boolean>(false);
 
   // Snippets Language Tab
@@ -121,7 +122,11 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
   const getFullDownloadApiUrl = () => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const keyToUse = apiKey || "SUA_API_KEY";
-    return `${origin}/api/v1/download?apikey=${keyToUse}&type=${downloadType}&url=${encodeURIComponent(downloadUrl)}`;
+    let urlStr = `${origin}/api/v1/download?apikey=${keyToUse}&type=${downloadType}&url=${encodeURIComponent(downloadUrl)}`;
+    if (downloadFormat) {
+      urlStr += `&format=${encodeURIComponent(downloadFormat)}`;
+    }
+    return urlStr;
   };
 
   const getFullSearchApiUrl = () => {
@@ -151,7 +156,10 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
         return `import requests\n\n# Busca de mídias no YouTube\nurl = "${origin}/api/v1/search"\nparams = {\n    "apikey": "${keyToUse}",\n    "q": "${searchQuery}"\n}\n\nresponse = requests.get(url, params=params)\ndata = response.json()\nprint(data)`;
       }
     } else {
-      const fullUrl = `${origin}/api/v1/download?apikey=${keyToUse}&type=${downloadType}&url=${encodeURIComponent(downloadUrl)}`;
+      let fullUrl = `${origin}/api/v1/download?apikey=${keyToUse}&type=${downloadType}&url=${encodeURIComponent(downloadUrl)}`;
+      if (downloadFormat) {
+        fullUrl += `&format=${encodeURIComponent(downloadFormat)}`;
+      }
       if (activeLang === "curl") {
         return `curl -o "media.${downloadType === "audio" ? "mp3" : "mp4"}" -L "${fullUrl}"`;
       } else if (activeLang === "javascript") {
@@ -457,7 +465,7 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
                 /api/v1/download
               </span>
               <span className="text-zinc-500 text-xs hidden sm:inline">&mdash;</span>
-              <span className="text-xs text-zinc-400">Pipa e transmite o stream de mídia (YouTube, TikTok, Instagram) diretamente</span>
+              <span className="text-xs text-zinc-400">Processa e transmite o stream de mídia (YouTube, TikTok, Instagram) via piping</span>
             </div>
             <span className="text-[10px] font-mono text-zinc-500">
               Autenticado: apikey
@@ -522,6 +530,20 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
                     value={downloadUrl}
                     onChange={(e) => setDownloadUrl(e.target.value)}
                     placeholder="Cole um link do YouTube, TikTok ou Instagram..."
+                    className="w-full px-3.5 py-2.5 bg-[#080808] border border-white/5 focus:border-emerald-500/20 focus:outline-none rounded-xl text-xs font-mono text-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-300 font-bold">format</span>
+                    <span className="text-zinc-500">Opcional (Ex: best, mp4, m4a, 137+140)</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={downloadFormat}
+                    onChange={(e) => setDownloadFormat(e.target.value)}
+                    placeholder="Ex: bestvideo+bestaudio"
                     className="w-full px-3.5 py-2.5 bg-[#080808] border border-white/5 focus:border-emerald-500/20 focus:outline-none rounded-xl text-xs font-mono text-white"
                   />
                 </div>
@@ -701,6 +723,151 @@ export function ApiDocsView({ user, token, onOpenAuth }: ApiDocsViewProps) {
             </div>
           </div>
         </div>
+
+
+        {/* ENDPOINT 5: Universal Media Info */}
+        <div className="bg-[#111111]/80 border border-white/5 rounded-2xl overflow-hidden shadow-md">
+          <div className="p-5 bg-zinc-900/45 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-3 py-1 bg-sky-500/10 border border-sky-500/25 text-[10px] font-mono font-bold text-sky-400 rounded-lg">
+                GET
+              </span>
+              <span className="font-mono text-xs text-zinc-300 font-bold">
+                /api/v1/info
+              </span>
+              <span className="text-zinc-500 text-xs hidden sm:inline">&mdash;</span>
+              <span className="text-xs text-zinc-400">Extrai todos os formatos, resoluções e informações de qualquer link</span>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500">
+              Autenticado: apikey
+            </span>
+          </div>
+          <div className="p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div className="xl:col-span-5 space-y-4">
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Parâmetros</h4>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-300 font-bold">url <span className="text-rose-500">*</span></span>
+                    <span className="text-zinc-500">Qualquer link (YT, Insta, TikTok, X)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="xl:col-span-7 space-y-3">
+              <span className="text-xs font-mono font-bold text-zinc-400 flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-zinc-500" /> Resposta Completa
+              </span>
+              <pre className="p-4 bg-[#050505] border border-white/5 rounded-xl text-[10px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
+{`{
+  "status": true,
+  "info": {
+    "id": "...",
+    "title": "...",
+    "formats": [ { "format_id": "137", "resolution": "1080p", "ext": "mp4", ... } ]
+  }
+}`}
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        {/* ENDPOINT 6: Playlist Info */}
+        <div className="bg-[#111111]/80 border border-white/5 rounded-2xl overflow-hidden shadow-md">
+          <div className="p-5 bg-zinc-900/45 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-3 py-1 bg-purple-500/10 border border-purple-500/25 text-[10px] font-mono font-bold text-purple-400 rounded-lg">
+                GET
+              </span>
+              <span className="font-mono text-xs text-zinc-300 font-bold">
+                /api/v1/playlist
+              </span>
+              <span className="text-zinc-500 text-xs hidden sm:inline">&mdash;</span>
+              <span className="text-xs text-zinc-400">Extrai todos os vídeos de uma playlist (YouTube, Spotify, etc)</span>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500">
+              Autenticado: apikey
+            </span>
+          </div>
+          <div className="p-6 grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div className="xl:col-span-5 space-y-4">
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Parâmetros</h4>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-300 font-bold">url <span className="text-rose-500">*</span></span>
+                    <span className="text-zinc-500">URL da playlist</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="xl:col-span-7 space-y-3">
+              <span className="text-xs font-mono font-bold text-zinc-400 flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-zinc-500" /> Formato da Resposta
+              </span>
+              <pre className="p-4 bg-[#050505] border border-white/5 rounded-xl text-[10px] font-mono text-purple-400 overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
+{`{
+  "status": true,
+  "info": {
+    "title": "My Playlist",
+    "entries": [ { "id": "...", "title": "..." }, ... ]
+  }
+}`}
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        {/* ENDPOINT 4: Image Generation Canvas API */}
+        <div className="bg-[#111111]/80 border border-white/5 rounded-2xl overflow-hidden shadow-md">
+          <div className="p-5 bg-zinc-900/45 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/25 text-[10px] font-mono font-bold text-amber-400 rounded-lg">
+                GET
+              </span>
+              <span className="font-mono text-xs text-zinc-300 font-bold">
+                /api/image/*
+              </span>
+              <span className="text-zinc-500 text-xs hidden sm:inline">&mdash;</span>
+              <span className="text-xs text-zinc-400">Geração de imagens dinâmicas via Canvas API</span>
+            </div>
+          </div>
+          
+          <div className="p-5 space-y-6">
+            <div className="grid xl:grid-cols-12 gap-8">
+              <div className="xl:col-span-12 space-y-6 text-sm text-zinc-400">
+                <p>Nossa API oferece uma suíte completa de endpoints para criação de imagens dinâmicas usando Canvas, Jimp, e Sharp. Ideal para bots de Discord, WhatsApp ou automações.</p>
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+                    <h5 className="text-white font-mono font-bold mb-2">Bem-vindo</h5>
+                    <code className="text-xs text-amber-400">/api/image/welcome?username=Nome&avatar=URL</code>
+                    <p className="text-[10px] mt-2">Cria uma imagem de boas-vindas bonita com avatar circular e degradê.</p>
+                  </div>
+                  
+                  <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+                    <h5 className="text-white font-mono font-bold mb-2">Ping (Status)</h5>
+                    <code className="text-xs text-amber-400">/api/image/ping?ms=24&ip=127.0.0.1</code>
+                    <p className="text-[10px] mt-2">Gera imagem de status de servidor ou conexão, excelente para stats de uptime.</p>
+                  </div>
+                  
+                  <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+                    <h5 className="text-white font-mono font-bold mb-2">Music Card</h5>
+                    <code className="text-xs text-amber-400">/api/image/musiccard?title=Música&artist=Artista&cover=URL&progress=50</code>
+                    <p className="text-[10px] mt-2">Cria um cartão de música tipo Spotify com capa, título e barra de progresso.</p>
+                  </div>
+                  
+                  <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+                    <h5 className="text-white font-mono font-bold mb-2">Menu Interativo</h5>
+                    <code className="text-xs text-amber-400">/api/image/menu?title=Comandos&items=Item 1,Item 2</code>
+                    <p className="text-[10px] mt-2">Renderiza uma lista customizável para usar como menus visuais em chats.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

@@ -20,6 +20,7 @@
     "axios": "^1.18.1",
     "axios-cookiejar-support": "^7.0.0",
     "bcryptjs": "^3.0.3",
+    "canvas": "^3.2.3",
     "cheerio": "^1.2.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",

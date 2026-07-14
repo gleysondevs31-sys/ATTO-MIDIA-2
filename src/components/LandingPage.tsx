@@ -185,20 +185,20 @@ export function LandingPage({
 
           {/* Subtitle Description */}
           <p className="text-zinc-400 text-sm md:text-base max-w-2xl mt-6 leading-relaxed font-sans">
-            Pesquise, assista, transmita e faça downloads instantâneos do <strong>YouTube</strong>, <strong>Instagram (Reels e Fotos)</strong> e <strong>TikTok (sem marca d'água)</strong>. Sem anúncios abusivos, rápido e 100% gratuito.
+            Baixe e pesquise <strong>vídeos, músicas e fotos</strong> do <strong>YouTube, Instagram, e TikTok</strong> de forma simples. Basta colar o link de qualquer vídeo na barra abaixo e clicar em pesquisar! Nossa plataforma converte links e facilita sua vida.
           </p>
 
           {/* INTERACTIVE SEARCH AND PASTE BAR */}
-          <div className="w-full max-w-3xl mt-10 p-1.5 rounded-2xl bg-zinc-900/60 border border-white/10 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-2xl relative">
+          <div className="w-full max-w-3xl mt-10 p-1.5 rounded-2xl bg-zinc-900/80 border border-white/20 focus-within:border-emerald-500/50 focus-within:ring-4 focus-within:ring-emerald-500/20 transition-all shadow-2xl relative backdrop-blur-xl">
             <form onSubmit={handleFormSubmit} className="flex flex-col sm:flex-row gap-2 items-stretch">
-              <div className="flex-1 flex items-center gap-3 px-3 py-2 text-zinc-400 focus-within:text-white transition-colors">
-                <Search className="w-5 h-5 text-zinc-500 flex-shrink-0" />
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 text-zinc-400 focus-within:text-white transition-colors">
+                <Search className="w-6 h-6 text-emerald-500 flex-shrink-0" />
                 <input
                   type="text"
-                  placeholder="Pesquise por música/vídeo ou cole um link do YouTube, TikTok, Instagram..."
+                  placeholder="Cole o link do YouTube, Instagram, TikTok aqui... Ou busque uma música!"
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
-                  className="w-full bg-transparent text-white placeholder-zinc-500 text-sm outline-none border-none py-1"
+                  className="w-full bg-transparent text-white placeholder-zinc-500 text-base md:text-lg outline-none border-none py-1"
                 />
                 {searchValue && (
                   <button 
