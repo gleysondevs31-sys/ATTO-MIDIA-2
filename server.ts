@@ -103,7 +103,7 @@ console.log(`[YouTube Setup] Initializing PlayEngine. cookiesPath=${cookiesPath}
 const playEngine = new PlayEngine({
   useAria2c: true,
   cookiesPath: hasCookies ? cookiesPath : undefined,
-  playerClient: "ios",
+  // playerClient: "ios",
   logger: customPlayLogger,
 });
 
@@ -3348,6 +3348,39 @@ app.get("/api/v1/search", authenticateApiKey, async (req, res) => {
 });
 
 // Developer API: Resolve URL (YouTube, TikTok, Instagram)
+
+// Developer API: Universal Media Info (All formats, metadata, etc.)
+app.get("/api/v1/info", authenticateApiKey, async (req, res) => {
+  const url = req.query.url;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
+  }
+  
+  try {
+    const ytdlp = (playEngine as any).ytdlp;
+    const raw = await ytdlp.exec(["-J", "--no-warnings", "--no-playlist", url]);
+    return res.json({ status: true, info: JSON.parse(raw) });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Erro ao obter informações", details: err.message });
+  }
+});
+
+// Developer API: Playlist Info
+app.get("/api/v1/playlist", authenticateApiKey, async (req, res) => {
+  const url = req.query.url;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "O parâmetro 'url' é obrigatório." });
+  }
+  
+  try {
+    const ytdlp = (playEngine as any).ytdlp;
+    const info = await ytdlp.getPlaylistInfo(url, { resolveLinks: false });
+    return res.json({ status: true, info });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Erro ao obter informações da playlist", details: err.message });
+  }
+});
+
 app.get("/api/v1/resolve", authenticateApiKey, async (req, res) => {
   const url = req.query.url;
   if (!url || typeof url !== "string") {
@@ -3376,6 +3409,7 @@ app.get("/api/v1/download", authenticateApiKey, async (req, res) => {
   const cleanMediaUrl = cleanUrl(url);
   const user = (req as any).apiUser;
   const downloadType = type === "video" ? "video" : "audio";
+  const format = req.query.format as string;
 
   console.log(`[API v1 Download] Request by user "${user?.username || "API_User"}" - type=${downloadType} url=${cleanMediaUrl}`);
   addYtPlayLog("info", `[API v1] Request from user "${user?.username}" for type="${downloadType}" with url="${cleanMediaUrl}"`);
@@ -3385,7 +3419,17 @@ app.get("/api/v1/download", authenticateApiKey, async (req, res) => {
 
   try {
     if (isYt) {
-      if (downloadType === "video") {
+      if (format) {
+        addYtPlayLog("info", `[API v1] Resolving custom format ${format} for "${cleanMediaUrl}"`);
+        const ytdlp = (playEngine as any).ytdlp;
+        const rawUrl = await ytdlp.exec(["-f", format, "-g", cleanMediaUrl]);
+        const directUrl = rawUrl.trim().split("\n")[0];
+        
+        const streamInfo = await (playEngine.stream as any).createHttpStream(directUrl);
+        res.setHeader("access-control-allow-origin", "*");
+        streamInfo.pipe(res);
+        return;
+      } else if (downloadType === "video") {
         addYtPlayLog("info", `[API v1] Calling playEngine.stream.getVideoStream("${cleanMediaUrl}")`);
         const streamInfo = await playEngine.stream.getVideoStream(cleanMediaUrl);
         
@@ -3499,7 +3543,106 @@ async function startServer() {
   // Ensure the PostgreSQL database is bootstrapped on server start-up
   await bootstrapDatabase();
 
-  if (process.env.NODE_ENV !== "production") {
+  
+  // --- Dynamic Scrapers API ---
+  app.get("/api/scrapers", async (req, res) => {
+    try {
+      const files = fs.readdirSync(path.join(process.cwd(), "src/scrapers"));
+      const scrapersList = files
+        .filter(f => f.endsWith(".ts") && f !== "index.ts")
+        .map(f => f.replace(".ts", ""));
+        
+      const scrapersData = [];
+      
+      for (const name of scrapersList) {
+        const scraperPath = path.join(process.cwd(), "src/scrapers", name + ".ts");
+        let methods = [];
+        let type = "unknown";
+        
+        try {
+          const moduleUrl = "file://" + scraperPath;
+          const imported = await import(moduleUrl);
+          const ScraperExport = imported.default || imported;
+          
+          if (typeof ScraperExport === 'function') {
+            try {
+              // Check if class
+              if (ScraperExport.toString().startsWith('class')) {
+                type = "class";
+                const props = Object.getOwnPropertyNames(ScraperExport.prototype);
+                methods = props.filter(p => p !== 'constructor');
+              } else {
+                type = "function";
+                methods = [ScraperExport.name || 'default'];
+              }
+            } catch(e) {}
+          } else if (typeof ScraperExport === 'object') {
+            type = "object";
+            methods = Object.keys(ScraperExport).filter(k => typeof ScraperExport[k] === 'function');
+          }
+        } catch(e) {
+           methods = ["error_loading"];
+        }
+        
+        scrapersData.push({
+          name,
+          type,
+          methods
+        });
+      }
+        
+      res.json({ success: true, count: scrapersData.length, scrapers: scrapersData });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, error: "Failed to list scrapers" });
+    }
+  });
+
+  app.all("/api/scrapers/:name", async (req, res) => {
+    try {
+      const { name } = req.params;
+      const scraperPath = path.join(process.cwd(), "src/scrapers", name + ".ts");
+      if (!fs.existsSync(scraperPath)) {
+        return res.status(404).json({ success: false, error: "Scraper not found" });
+      }
+      
+      const moduleUrl = "file://" + scraperPath;
+      const imported = await import(moduleUrl);
+      const ScraperExport = imported.default || imported;
+      
+      let result;
+      const args = req.method === 'GET' ? req.query : req.body;
+      
+      if (typeof ScraperExport === 'function') {
+        if (ScraperExport.toString().startsWith('class')) {
+           const instance = new ScraperExport();
+           if (args.method && typeof instance[args.method] === 'function') {
+              const methodArgs = args.args ? (Array.isArray(args.args) ? args.args : [args.args]) : [];
+              result = await instance[args.method](...methodArgs);
+           } else {
+              result = instance;
+           }
+        } else {
+           const methodArgs = args.args ? (Array.isArray(args.args) ? args.args : [args.args]) : [];
+           result = await ScraperExport(...methodArgs);
+        }
+      } else if (typeof ScraperExport === 'object') {
+         if (args.method && typeof ScraperExport[args.method] === 'function') {
+            const methodArgs = args.args ? (Array.isArray(args.args) ? args.args : [args.args]) : [];
+            result = await ScraperExport[args.method](...methodArgs);
+         } else {
+            result = ScraperExport;
+         }
+      }
+      
+      res.json({ success: true, data: result });
+    } catch (error) {
+      console.error("Scraper Error:", error);
+      res.status(500).json({ success: false, error: error.message || "Failed to execute scraper" });
+    }
+  });
+  // -----------------------------
+if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

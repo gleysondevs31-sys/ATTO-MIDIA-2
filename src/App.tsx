@@ -29,6 +29,7 @@ import { ProviderDownloader } from "./components/ProviderDownloader";
 import { NowPlayingView } from "./components/NowPlayingView";
 import { BannerDisplay } from "./components/BannerDisplay";
 import { ApiDocsView } from "./components/ApiDocsView";
+import { ScrapersDocsView } from "./components/ScrapersDocsView";
 
 export default function App() {
   const { toast } = useToast();
@@ -883,6 +884,8 @@ export default function App() {
               onBackToExplore={() => setCurrentView("explore")}
               initialTab={legalTab}
             />
+          ) : currentView === "scrapers" ? (
+            <ScrapersDocsView />
           ) : currentView === "api-docs" ? (
             <ApiDocsView
               user={user}
