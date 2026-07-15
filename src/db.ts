@@ -56,6 +56,8 @@ export async function bootstrapDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMP;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS api_key VARCHAR(255) UNIQUE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_frame VARCHAR(100) DEFAULT 'none';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS badges TEXT DEFAULT '[]';
     `);
     console.log("[DB] 'users' table verified/created.");
 

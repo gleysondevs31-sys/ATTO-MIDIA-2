@@ -19,6 +19,9 @@ import { useToast } from "./components/Toast";
 import { AuthModal } from "./components/AuthModal";
 import { FavoritesView } from "./components/FavoritesView";
 import { ProfileView } from "./components/ProfileView";
+import { CommunityView } from "./components/CommunityView";
+import { PartnersView } from "./components/PartnersView";
+import { ImageBankView } from "./components/ImageBankView";
 import { LandingPage } from "./components/LandingPage";
 import { AdminPanel } from "./components/AdminPanel";
 

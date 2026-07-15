@@ -1,3 +1,4 @@
+import uploadApi from "./src/upload-api.js";
 import imageApi from "./src/image-api.js";
 import express from "express";
 import path from "path";
@@ -101,7 +102,9 @@ const customPlayLogger = {
 const cookiesPath = path.join(process.cwd(), "cookies.txt");
 const hasCookies = fs.existsSync(cookiesPath);
 console.log(`[YouTube Setup] Initializing PlayEngine. cookiesPath=${cookiesPath} (exists=${hasCookies})`);
+const binDir = path.join(process.cwd(), "node_modules", "@irithell-js", "yt-play", "bin");
 const playEngine = new PlayEngine({
+  ytdlpBinaryPath: path.join(binDir, "yt-dlp"),
   useAria2c: true,
   cookiesPath: hasCookies ? cookiesPath : undefined,
   // playerClient: "ios",
@@ -275,6 +278,8 @@ const YT_API_BASE_URL = cleanUrl(process.env.YT_API_BASE_URL || "https://yt-api.
 
 app.use(express.json());
 app.use("/api/image", imageApi);
+  app.use("/api/upload", uploadApi);
+  app.use("/uploads", express.static(path.join(process.cwd(), "public/uploads")));
 
 // In-memory rate limiting middleware for IP-based API protection
 const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
@@ -2100,7 +2105,7 @@ app.put("/api/auth/profile", authenticateToken, async (req, res) => {
   const authReq = req as AuthRequest;
   if (!authReq.user) return res.status(401).json({ error: "Não autorizado" });
 
-  const { username, avatar, bio, theme } = req.body;
+  const { username, avatar, bio, theme, avatar_frame } = req.body;
 
   try {
     // Validate unique username if changed
@@ -2121,12 +2126,13 @@ app.put("/api/auth/profile", authenticateToken, async (req, res) => {
            bio = COALESCE($3, bio), 
            theme = COALESCE($4, theme) 
        WHERE id = $5 
-       RETURNING id, username, email, avatar, bio, role, theme, plan, coins, plan_expires_at, created_at`,
+       RETURNING id, username, email, avatar, bio, role, theme, plan, coins, plan_expires_at, created_at, avatar_frame, badges`,
       [
         username ? username.trim() : null,
         avatar ? avatar.trim() : null,
         bio ? bio.trim() : null,
         theme ? theme.trim() : null,
+        avatar_frame ? avatar_frame.trim() : null,
         authReq.user.id
       ]
     );
@@ -2914,6 +2920,19 @@ app.get("/api/admin/logs", authenticateToken, requireAdmin, async (req, res) => 
 // ==========================================
 
 // Get all available platforms (public endpoint used by sidebar/search filter)
+
+// Community Ranking
+app.get("/api/community/ranking", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, username, avatar, bio, coins, is_verified FROM users ORDER BY coins DESC LIMIT 50"
+    );
+    res.json({ success: true, users: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Erro ao buscar ranking" });
+  }
+});
+
 app.get("/api/platforms", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM platforms_config ORDER BY id ASC");
@@ -3541,7 +3560,74 @@ app.get("/api/v1/download", authenticateApiKey, async (req, res) => {
 // ==========================================
 // VITE DEV & PRODUCTION STATIC APP ROUTING
 // ==========================================
+
+import https from "https";
+
+async function ensureValidYtDlp() {
+  const binDir = path.join(process.cwd(), "node_modules", "@irithell-js", "yt-play", "bin");
+  if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
+  const binPath = path.join(binDir, "yt-dlp");
+  
+  if (fs.existsSync(binPath)) {
+    const buffer = Buffer.alloc(4);
+    const fd = fs.openSync(binPath, 'r');
+    fs.readSync(fd, buffer, 0, 4, 0);
+    fs.closeSync(fd);
+    
+    // Check for ELF magic number (ELF)
+    if (buffer.toString('hex') === '7f454c46') {
+      console.log("[YouTube Setup] Valid ELF yt-dlp binary found.");
+      return;
+    }
+    console.log("[YouTube Setup] Invalid yt-dlp binary found (corrupted/rate-limited). Redownloading...");
+  }
+
+  console.log("[YouTube Setup] Fetching latest yt-dlp release URL from github releases...");
+  try {
+    const latestUrl = await new Promise((resolve, reject) => {
+      https.get("https://github.com/yt-dlp/yt-dlp/releases/latest", (res) => {
+        if (res.statusCode === 302) {
+          resolve(res.headers.location);
+        } else {
+          reject(new Error("Failed to get latest release"));
+        }
+      }).on("error", reject);
+    });
+
+    const versionMatch = latestUrl.match(/\/tag\/(.+)$/);
+    if (!versionMatch) throw new Error("Could not parse version");
+    const version = versionMatch[1];
+    
+    const downloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${version}/yt-dlp_linux`;
+    console.log("[YouTube Setup] Downloading from:", downloadUrl);
+
+    await new Promise((resolve, reject) => {
+      https.get(downloadUrl, (res) => {
+        if (res.statusCode === 302) {
+          https.get(res.headers.location, (res2) => {
+            const file = fs.createWriteStream(binPath);
+            res2.pipe(file);
+            file.on('finish', () => {
+              file.close();
+              fs.chmodSync(binPath, "755");
+              resolve();
+            });
+          }).on("error", reject);
+        } else {
+          reject(new Error("Expected redirect"));
+        }
+      }).on("error", reject);
+    });
+    console.log("[YouTube Setup] yt-dlp downloaded and fixed successfully.");
+  } catch (err) {
+    console.error("[YouTube Setup] Failed to fix yt-dlp:", err);
+  }
+}
+
+
 async function startServer() {
+  await ensureValidYtDlp();
+
   // Ensure the PostgreSQL database is bootstrapped on server start-up
   await bootstrapDatabase();
 

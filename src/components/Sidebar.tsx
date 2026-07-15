@@ -1,5 +1,5 @@
 import React from "react";
-import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram, Sparkles, Code2 } from "lucide-react";
+import { Compass, Film, Heart, Settings, Shield, Info, ExternalLink, HelpCircle, LayoutGrid, Youtube, Music, Play, History, Trash2, X, Instagram, Sparkles, Code2, Users, Handshake, Image as ImageIcon } from "lucide-react";
 import { AttoLogo } from "./AttoLogo";
 
 interface SidebarProps {
@@ -202,7 +202,50 @@ export function Sidebar({
               }`}
             >
               <Code2 className="w-4 h-4 text-amber-400" />
-              <span>Scrapers API</span>
+              <span>Lab / Testes API</span>
+            </button>
+
+            
+            {/* Comunidade */}
+            <button
+              id="btn-nav-community"
+              onClick={() => handleSelectNav("community")}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "community"
+                  ? "border-primary/30 bg-primary/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Users className="w-4 h-4 text-purple-400" />
+              <span>Comunidade (Ranking)</span>
+            </button>
+
+            {/* Parceiros */}
+            <button
+              id="btn-nav-partners"
+              onClick={() => handleSelectNav("partners")}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "partners"
+                  ? "border-primary/30 bg-primary/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <Handshake className="w-4 h-4 text-indigo-400" />
+              <span>Parceiros</span>
+            </button>
+            
+            {/* Banco de Imagens */}
+            <button
+              id="btn-nav-image-bank"
+              onClick={() => handleSelectNav("image-bank")}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === "image-bank"
+                  ? "border-primary/30 bg-primary/10 text-white shadow-sm"
+                  : "border-transparent hover:border-white/10 hover:bg-[#111111]/40 text-gray-400 hover:text-white"
+              }`}
+            >
+              <ImageIcon className="w-4 h-4 text-cyan-400" />
+              <span>Banco de Imagens</span>
             </button>
 
             {/* Documentação API */}

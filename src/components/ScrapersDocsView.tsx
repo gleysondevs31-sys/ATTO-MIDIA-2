@@ -60,10 +60,10 @@ export function ScrapersDocsView({ onBack }: { onBack?: () => void }) {
       <div className="p-6 border-b border-white/5 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-display font-black tracking-tight flex items-center gap-2">
-            <Code2 className="w-5 h-5 text-amber-500" /> API de Scrapers ATTO
+            <Code2 className="w-5 h-5 text-amber-500" /> Laboratório / Testes de Scrapers
           </h2>
           <p className="text-xs text-zinc-400 font-mono mt-1">
-            Explore e teste os +100 scrapers dinâmicos injetados no sistema.
+            Explore, depure e teste todos os scrapers de forma visual e amigável.
           </p>
         </div>
       </div>
@@ -122,13 +122,13 @@ export function ScrapersDocsView({ onBack }: { onBack?: () => void }) {
               <div>
                 <h3 className="text-2xl font-bold font-mono text-amber-400 mb-2">{selectedScraper.name}</h3>
                 <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
-                  <span className="px-2 py-1 bg-white/5 rounded border border-white/5">Tipo: {selectedScraper.type}</span>
-                  <span className="px-2 py-1 bg-white/5 rounded border border-white/5">Métodos disponíveis: {selectedScraper.methods.length}</span>
+                  <span className="px-3 py-1.5 bg-amber-500/10 text-amber-500 rounded border border-amber-500/20 font-bold">Tipo: {selectedScraper.type}</span>
+                  <span className="px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 font-bold">Métodos: {selectedScraper.methods.length}</span>
                 </div>
               </div>
 
               <div className="bg-[#111111]/80 border border-white/5 rounded-2xl p-5 space-y-4">
-                <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Testar na API</h4>
+                <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Ambiente de Teste Rápido</h4>
                 
                 <div className="space-y-3">
                   <div className="space-y-2">
