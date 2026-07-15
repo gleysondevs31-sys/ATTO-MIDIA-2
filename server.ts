@@ -1,3 +1,4 @@
+import imageApi from "./src/image-api.js";
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
@@ -273,6 +274,7 @@ const API_BASE_URL = cleanUrl(process.env.ZERO_TWO_API_BASE_URL || "https://zero
 const YT_API_BASE_URL = cleanUrl(process.env.YT_API_BASE_URL || "https://yt-api.zero-two-apis.store").replace(".com.br", ".store");
 
 app.use(express.json());
+app.use("/api/image", imageApi);
 
 // In-memory rate limiting middleware for IP-based API protection
 const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
