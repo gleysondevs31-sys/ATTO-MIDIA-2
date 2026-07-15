@@ -2124,8 +2124,9 @@ app.put("/api/auth/profile", authenticateToken, async (req, res) => {
        SET username = COALESCE($1, username), 
            avatar = COALESCE($2, avatar), 
            bio = COALESCE($3, bio), 
-           theme = COALESCE($4, theme) 
-       WHERE id = $5 
+           theme = COALESCE($4, theme),
+           avatar_frame = COALESCE($5, avatar_frame)
+       WHERE id = $6 
        RETURNING id, username, email, avatar, bio, role, theme, plan, coins, plan_expires_at, created_at, avatar_frame, badges`,
       [
         username ? username.trim() : null,

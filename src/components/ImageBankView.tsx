@@ -46,12 +46,33 @@ export function ImageBankView() {
         </div>
 
 
-        <div>
-          <h1 className="text-3xl font-display font-black text-white flex items-center gap-3">
-            <ImageIcon className="w-8 h-8 text-cyan-400" /> Banco de Imagens
-          </h1>
-          <p className="text-zinc-400 mt-2">Explore e baixe imagens compartilhadas pela comunidade. Use nossa API para gerar e upar imagens!</p>
+        
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-black text-white flex items-center gap-3">
+              <ImageIcon className="w-8 h-8 text-cyan-400" /> Banco de Imagens
+            </h1>
+            <p className="text-zinc-400 mt-2">Explore e baixe imagens compartilhadas pela comunidade. Use nossa API para gerar e upar imagens!</p>
+          </div>
+          <label className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl cursor-pointer flex items-center gap-2 transition-colors">
+            <UploadCloud className="w-5 h-5" /> Fazer Upload
+            <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+              if (!e.target.files?.[0]) return;
+              const fd = new FormData();
+              fd.append("image", e.target.files[0]);
+              try {
+                const res = await fetch("/api/upload/image", { method: "POST", body: fd });
+                const data = await res.json();
+                if (data.success) {
+                  setImages(prev => [data.url, ...prev]);
+                }
+              } catch (err) {
+                console.error(err);
+              }
+            }} />
+          </label>
         </div>
+
 
         {loading ? (
           <div className="text-center py-10 text-zinc-500">Carregando galeria...</div>

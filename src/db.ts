@@ -185,6 +185,21 @@ export async function bootstrapDatabase() {
       console.log("[DB] Existing YouTube config checked and updated. Soundcloud and Spotify disabled.");
     }
 
+    
+    // 8. Create Partners Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS partners (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        role VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        link_url TEXT,
+        icon_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("[DB] 'partners' table verified/created.");
+
     console.log("[DB] Database auto-bootstrap completed successfully!");
   } catch (error: any) {
     console.error("[DB] Database auto-bootstrap failed:", error.message);
