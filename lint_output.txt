@@ -1,0 +1,433 @@
+
+> react-example@0.0.0 lint
+> tsc --noEmit
+
+server.ts(3598,36): error TS2339: Property 'match' does not exist on type 'unknown'.
+server.ts(3614,15): error TS2794: Expected 1 arguments, but got 0. Did you forget to include 'void' in your type argument to 'Promise'?
+src/components/CommunityView.tsx(3,10): error TS2305: Module '"../types"' has no exported member 'User'.
+src/scrapers/@api.ts(99,33): error TS2872: This kind of expression is always truthy.
+src/scrapers/@api.ts(100,32): error TS2872: This kind of expression is always truthy.
+src/scrapers/@api.ts(101,34): error TS2872: This kind of expression is always truthy.
+src/scrapers/@api.ts(102,36): error TS2872: This kind of expression is always truthy.
+src/scrapers/@api.ts(103,39): error TS2872: This kind of expression is always truthy.
+src/scrapers/@api.ts(104,42): error TS2872: This kind of expression is always truthy.
+src/scrapers/@api.ts(213,14): error TS2304: Cannot find name 'isi'.
+src/scrapers/@api.ts(214,14): error TS2304: Cannot find name 'fileName'.
+src/scrapers/@api.ts(216,14): error TS2304: Cannot find name 'isi'.
+src/scrapers/@api.ts(217,14): error TS2304: Cannot find name 'fileName'.
+src/scrapers/@api.ts(220,28): error TS18004: No value exists in scope for the shorthand property 'fileName'. Either declare one or provide an initializer.
+src/scrapers/J2Download.ts(11,14): error TS2339: Property 'userAgent' does not exist on type 'J2Download'.
+src/scrapers/J2Download.ts(12,14): error TS2339: Property 'baseHeaders' does not exist on type 'J2Download'.
+src/scrapers/J2Download.ts(18,32): error TS2339: Property 'userAgent' does not exist on type 'J2Download'.
+src/scrapers/J2Download.ts(26,28): error TS2339: Property 'baseHeaders' does not exist on type 'J2Download'.
+src/scrapers/J2Download.ts(59,21): error TS2339: Property 'cookies' does not exist on type '{}'.
+src/scrapers/J2Download.ts(59,30): error TS2339: Property 'csrfToken' does not exist on type '{}'.
+src/scrapers/J2Download.ts(70,29): error TS2339: Property 'baseHeaders' does not exist on type 'J2Download'.
+src/scrapers/SoundCloud.ts(13,6): error TS2339: Property 'baseUrl' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(14,6): error TS2339: Property 'downloadUrl' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(15,6): error TS2339: Property 'userAgent' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(16,6): error TS2339: Property 'jar' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(17,6): error TS2339: Property 'client' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(21,11): error TS2339: Property 'client' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(24,6): error TS2339: Property 'client' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(25,11): error TS2339: Property 'jar' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(29,13): error TS2339: Property 'client' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(34,40): error TS2339: Property 'downloadUrl' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(35,31): error TS2339: Property 'userAgent' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(54,41): error TS2339: Property 'downloadUrl' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(57,20): error TS2339: Property 'userAgent' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(58,15): error TS2339: Property 'downloadUrl' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SoundCloud.ts(59,14): error TS2339: Property 'baseUrl' does not exist on type 'SoundCloudScraper'.
+src/scrapers/SpotifyDL.ts(7,10): error TS2339: Property 'clientID' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(8,10): error TS2339: Property 'clientSecret' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(9,10): error TS2339: Property 'basic' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(9,38): error TS2339: Property 'clientID' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(9,55): error TS2339: Property 'clientSecret' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(10,10): error TS2339: Property 'tokenEndpoint' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(15,12): error TS2339: Property 'tokenEndpoint' does not exist on type 'SpotifyDL'.
+src/scrapers/SpotifyDL.ts(18,51): error TS2339: Property 'basic' does not exist on type 'SpotifyDL'.
+src/scrapers/Spotifypl.ts(7,10): error TS2339: Property 'clientID' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(8,10): error TS2339: Property 'clientSecret' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(9,10): error TS2339: Property 'basic' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(9,38): error TS2339: Property 'clientID' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(9,55): error TS2339: Property 'clientSecret' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(10,10): error TS2339: Property 'tokenEndpoint' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(15,46): error TS2339: Property 'tokenEndpoint' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(16,51): error TS2339: Property 'basic' does not exist on type 'Spotify'.
+src/scrapers/Spotifypl.ts(42,17): error TS2339: Property 'status' does not exist on type 'unknown'.
+src/scrapers/Spotifypl.ts(44,53): error TS2339: Property 'data' does not exist on type 'unknown'.
+src/scrapers/amp.ts(8,6): error TS2339: Property 'axios' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(9,6): error TS2339: Property 'wrapper' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(10,6): error TS2339: Property 'FormData' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(11,6): error TS2339: Property 'WebSocket' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(12,6): error TS2339: Property 'cheerio' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(13,6): error TS2339: Property 'CookieJar' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(14,6): error TS2339: Property 'crypto' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(15,6): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(30,6): error TS2339: Property 'jar' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(30,21): error TS2339: Property 'CookieJar' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(31,6): error TS2339: Property 'client' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(31,20): error TS2339: Property 'wrapper' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(31,33): error TS2339: Property 'axios' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(31,58): error TS2339: Property 'jar' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(35,30): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(40,34): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(40,62): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(51,21): error TS2339: Property 'crypto' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(75,24): error TS2339: Property 'WebSocket' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(76,21): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(116,22): error TS2339: Property 'error' does not exist on type 'true | { error: string; available: any; }'.
+  Property 'error' does not exist on type 'true'.
+src/scrapers/amp.ts(117,22): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(119,6): error TS2339: Property 'client' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(120,16): error TS2339: Property 'cheerio' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(123,23): error TS2339: Property 'FormData' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(130,6): error TS2339: Property 'client' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(131,20): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(149,6): error TS2339: Property 'client' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(152,9): error TS2339: Property 'config' does not exist on type 'AmpDownloader'.
+src/scrapers/amp.ts(159,47): error TS2339: Property 'worker' does not exist on type 'unknown'.
+src/scrapers/amp.ts(159,105): error TS2339: Property 'file' does not exist on type 'unknown'.
+src/scrapers/amp.ts(162,17): error TS2339: Property 'title' does not exist on type 'unknown'.
+src/scrapers/amp.ts(165,21): error TS2339: Property 'thumbnail' does not exist on type 'unknown'.
+src/scrapers/amp.ts(167,20): error TS2339: Property 'duration' does not exist on type 'unknown'.
+src/scrapers/amp.ts(169,28): error TS2339: Property 'uploader' does not exist on type 'unknown'.
+src/scrapers/applemusic.ts(68,21): error TS2339: Property 'name' does not exist on type '{}'.
+src/scrapers/applemusic.ts(69,23): error TS2339: Property 'artist' does not exist on type '{}'.
+src/scrapers/applemusic.ts(70,22): error TS2339: Property 'album' does not exist on type '{}'.
+src/scrapers/applemusic.ts(71,21): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/applescraper.ts(177,1): error TS2353: Object literal may only specify known properties, and 'idFaixa' does not exist in type '{ nome: string; artista: string; album: string; imagem: string; url: any; genero: string; dataLancamento: string; duracao: number; pais: string; explicito: boolean; }'.
+src/scrapers/applescraper.ts(276,5): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(277,5): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(278,5): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(281,6): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(282,6): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(283,6): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(284,6): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(284,30): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/applescraper.ts(284,54): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/brasileirao-2025.ts(12,10): error TS2339: Property 'tabelaUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(13,10): error TS2339: Property 'jogosUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(14,10): error TS2339: Property 'artilhariaUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(15,10): error TS2339: Property 'noticiasUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(16,10): error TS2339: Property 'headers' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(24,40): error TS2339: Property 'tabelaUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(24,67): error TS2339: Property 'headers' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(47,40): error TS2339: Property 'artilhariaUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(47,71): error TS2339: Property 'headers' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(63,40): error TS2339: Property 'jogosUrl' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brasileirao-2025.ts(63,66): error TS2339: Property 'headers' does not exist on type 'BrasileiraoScraper'.
+src/scrapers/brat.ts(8,10): error TS2339: Property 'BASE_URLS' does not exist on type 'BratService'.
+src/scrapers/brat.ts(13,41): error TS2339: Property 'BASE_URLS' does not exist on type 'BratService'.
+src/scrapers/brat.ts(16,10): error TS2339: Property 'BASE_URL' does not exist on type 'BratService'.
+src/scrapers/brat.ts(16,26): error TS2339: Property 'BASE_URLS' does not exist on type 'BratService'.
+src/scrapers/brat.ts(20,25): error TS2339: Property 'BASE_URL' does not exist on type 'BratService'.
+src/scrapers/copilot2.ts(102,24): error TS2339: Property 'text' does not exist on type 'unknown'.
+src/scrapers/copilot2.ts(103,27): error TS2339: Property 'citations' does not exist on type 'unknown'.
+src/scrapers/download.ts(39,60): error TS2794: Expected 1 arguments, but got 0. Did you forget to include 'void' in your type argument to 'Promise'?
+src/scrapers/encurta.net.ts(10,1): error TS2339: Property 'alias' does not exist on type '{}'.
+src/scrapers/encurta.net.ts(11,1): error TS2339: Property 'format' does not exist on type '{}'.
+src/scrapers/encurta.net.ts(12,1): error TS2339: Property 'type' does not exist on type '{}'.
+src/scrapers/export.ts(35,14): error TS2872: This kind of expression is always truthy.
+src/scrapers/export.ts(39,18): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/export.ts(39,36): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/export.ts(41,13): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/export.ts(41,31): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/export.ts(48,12): error TS2630: Cannot assign to '_0x5cb9' because it is a function.
+src/scrapers/export.ts(66,89): error TS2872: This kind of expression is always truthy.
+src/scrapers/export.ts(71,30): error TS2322: Type 'any' is not assignable to type 'never'.
+src/scrapers/export.ts(71,108): error TS2322: Type 'any' is not assignable to type 'never'.
+src/scrapers/export.ts(92,5): error TS2630: Cannot assign to '_0x3004' because it is a function.
+src/scrapers/fetcher.ts(6,21): error TS2304: Cannot find name 'getBase64'.
+src/scrapers/fetcher.ts(15,21): error TS2304: Cannot find name 'getBuffer'.
+src/scrapers/fetcher.ts(24,21): error TS2304: Cannot find name 'fetchJson'.
+src/scrapers/fetcher.ts(37,21): error TS2304: Cannot find name 'fetchText'.
+src/scrapers/functions.ts(25,21): error TS2304: Cannot find name 'fetchJson'.
+src/scrapers/get-noticias-space.ts(36,6): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(37,6): error TS2339: Property 'translateApiUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(38,6): error TS2339: Property 'headers' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(66,42): error TS2339: Property 'translateApiUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(146,55): error TS2339: Property 'headers' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(157,52): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(174,47): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(200,41): error TS2339: Property 'imagens' does not exist on type '{}'.
+src/scrapers/get-noticias-space.ts(201,40): error TS2339: Property 'videos' does not exist on type '{}'.
+src/scrapers/get-noticias-space.ts(202,44): error TS2339: Property 'documentos' does not exist on type '{}'.
+src/scrapers/get-noticias-space.ts(203,11): error TS2339: Property 'metadados' does not exist on type '{ conteudo_completo: any; midia: {}; }'.
+src/scrapers/get-noticias-space.ts(216,32): error TS2339: Property 'metadados' does not exist on type '{ conteudo_completo: any; midia: {}; }'.
+src/scrapers/get-noticias-space.ts(217,45): error TS2339: Property 'metadados' does not exist on type '{ conteudo_completo: any; midia: {}; }'.
+src/scrapers/get-noticias-space.ts(218,36): error TS2339: Property 'metadados' does not exist on type '{ conteudo_completo: any; midia: {}; }'.
+src/scrapers/get-noticias-space.ts(229,39): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(230,15): error TS2339: Property 'headers' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(248,63): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(260,9): error TS2339: Property 'midia' does not exist on type '{ titulo: any; resumo: any; conteudo: any; data: any; link: any; }'.
+src/scrapers/get-noticias-space.ts(261,64): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(265,15): error TS2339: Property 'metadados' does not exist on type '{ conteudo_completo: any; midia: {}; }'.
+src/scrapers/get-noticias-space.ts(266,9): error TS2339: Property 'metadados' does not exist on type '{ titulo: any; resumo: any; conteudo: any; data: any; link: any; }'.
+src/scrapers/get-noticias-space.ts(266,30): error TS2339: Property 'metadados' does not exist on type '{ conteudo_completo: any; midia: {}; }'.
+src/scrapers/get-noticias-space.ts(281,13): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/get-noticias-space.ts(303,13): error TS2339: Property 'baseUrl' does not exist on type 'SpaceNewsScraper'.
+src/scrapers/grabtheclip.ts(10,6): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(16,6): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(17,6): error TS2339: Property 'creator' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(24,52): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(26,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(28,36): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(29,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(33,32): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(34,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(41,52): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(43,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(45,36): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(46,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(50,32): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(51,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(58,52): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(60,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(62,36): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(63,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(67,32): error TS2339: Property 'base' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(68,17): error TS2339: Property 'headers' does not exist on type 'GrabTheClip'.
+src/scrapers/grabtheclip.ts(86,15): error TS2339: Property 'creator' does not exist on type 'GrabTheClip'.
+src/scrapers/icms.ts(139,15): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/scrapers/icms.ts(153,19): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/scrapers/imgtoanime.ts(26,5): error TS2339: Property 'prompt' does not exist on type '{}'.
+src/scrapers/index.ts(32,10): error TS2305: Module '"./fetcher.ts"' has no exported member 'default'.
+src/scrapers/index.ts(34,10): error TS2305: Module '"./funes.ts"' has no exported member 'default'.
+src/scrapers/index.ts(35,10): error TS2305: Module '"./fun\u00E7\u00F5es.ts"' has no exported member 'default'.
+src/scrapers/index.ts(56,10): error TS2305: Module '"./myfunc.ts"' has no exported member 'default'.
+src/scrapers/index.ts(59,10): error TS2305: Module '"./options.ts"' has no exported member 'default'.
+src/scrapers/index.ts(74,21): error TS2300: Duplicate identifier 'scraper_yt'.
+src/scrapers/index.ts(80,21): error TS2300: Duplicate identifier 'scraper_yt'.
+src/scrapers/kwai.ts(16,9): error TS2339: Property 'query' does not exist on type 'Object'.
+src/scrapers/kwai.ts(16,16): error TS2339: Property 'cookie' does not exist on type 'Object'.
+src/scrapers/kwai.ts(17,6): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(18,6): error TS2339: Property 'cookie' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(21,11): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(24,30): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(24,45): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(26,6): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(27,39): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(29,6): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(35,18): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(41,12): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(41,50): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(49,18): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(55,14): error TS2339: Property 'cookie' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(57,67): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(93,12): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(93,68): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(97,19): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(105,6): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(110,12): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(110,67): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(114,19): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(147,36): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwai.ts(149,43): error TS2339: Property 'query' does not exist on type 'Kwai'.
+src/scrapers/kwaidl.ts(82,7): error TS2339: Property 'total_videos' does not exist on type '{ id_usuario: any; nome: any; nome_usuario: any; data_criacao: any; seguidores: any; seguindo: any; curtidas: any; bio: any; foto_perfil: any; url_perfil: any; links_alternativos: any; }'.
+src/scrapers/kwaidl.ts(83,7): error TS2339: Property 'videos' does not exist on type '{ id_usuario: any; nome: any; nome_usuario: any; data_criacao: any; seguidores: any; seguindo: any; curtidas: any; bio: any; foto_perfil: any; url_perfil: any; links_alternativos: any; }'.
+src/scrapers/letraMusic.ts(18,18): error TS2339: Property 'ImagemMusic' does not exist on type '{}'.
+src/scrapers/letraMusic.ts(20,16): error TS2339: Property 'LetraDaMusica' does not exist on type '{}'.
+src/scrapers/mediafire.ts(14,1): error TS2632: Cannot assign to 'mime' because it is an import.
+src/scrapers/mediafire.ts(14,1): error TS2686: 'mime' refers to a UMD global, but the current file is a module. Consider adding an import instead.
+src/scrapers/mediafire.ts(15,1): error TS2632: Cannot assign to 'mime' because it is an import.
+src/scrapers/mediafire.ts(15,1): error TS2686: 'mime' refers to a UMD global, but the current file is a module. Consider adding an import instead.
+src/scrapers/mediafire.ts(15,8): error TS2686: 'mime' refers to a UMD global, but the current file is a module. Consider adding an import instead.
+src/scrapers/mediafire.ts(16,20): error TS2686: 'mime' refers to a UMD global, but the current file is a module. Consider adding an import instead.
+src/scrapers/metadinhas.ts(48,33): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/metadinhas.ts(48,61): error TS2339: Property 'includes' does not exist on type 'unknown'.
+src/scrapers/metadinhas.ts(49,29): error TS2339: Property 'replace' does not exist on type 'unknown'.
+src/scrapers/myanimes.ts(38,27): error TS2339: Property 'description' does not exist on type '{ title: any; imgUrl: string; year: any; author: any; director: any; studio: any; total_ep: number; genres: any[]; sinopse: any; episodes: any[]; }'.
+src/scrapers/naya-api-dl.ts(13,8): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(14,12): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(15,10): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(16,9): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(17,10): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(18,14): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(23,9): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(24,12): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(25,9): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(26,8): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/naya-api-dl.ts(27,10): error TS2554: Expected 2 arguments, but got 1.
+src/scrapers/ocr.ts(8,25): error TS2339: Property 'binary' does not exist on type '{}'.
+src/scrapers/ocr.ts(11,14): error TS2339: Property 'debug' does not exist on type '{}'.
+src/scrapers/ocr.ts(15,18): error TS2339: Property 'debug' does not exist on type '{}'.
+src/scrapers/pinterest.ts(97,39): error TS2339: Property 'userAgent' does not exist on type 'Pinterest'.
+src/scrapers/pinterest.ts(103,130): error TS2339: Property 'semResult' does not exist on type 'Pinterest'.
+src/scrapers/pinterestboru.ts(97,39): error TS2339: Property 'userAgent' does not exist on type 'Pinterest'.
+src/scrapers/pinterestboru.ts(103,130): error TS2339: Property 'semResult' does not exist on type 'Pinterest'.
+src/scrapers/playdl.ts(12,10): error TS2339: Property 'hex' does not exist on type 'Youtubers'.
+src/scrapers/playdl.ts(30,39): error TS2339: Property 'hex' does not exist on type 'Youtubers'.
+src/scrapers/savefrom.ts(5,32): error TS2307: Cannot find module 'got' or its corresponding type declarations.
+src/scrapers/scraper-2.ts(113,67): error TS2304: Cannot find name 'link'.
+src/scrapers/scraper_pinterest2.ts(91,11): error TS2339: Property 'url' does not exist on type 'unknown'.
+src/scrapers/scraper_pinterest2.ts(93,16): error TS2339: Property 'duration' does not exist on type 'unknown'.
+src/scrapers/scraper_pinterest2.ts(94,20): error TS2339: Property 'content_type' does not exist on type 'unknown'.
+src/scrapers/scraper_pinterest2.ts(122,11): error TS2339: Property 'url' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(51,20): error TS2367: This comparison appears to be unintentional because the types 'string' and 'number' have no overlap.
+src/scrapers/spotify.ts(160,44): error TS2339: Property 'audioUrl' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(161,40): error TS2339: Property 'size' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(162,35): error TS2339: Property 'lyricsStr' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(163,37): error TS2339: Property 'lyricsArray' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(205,17): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(208,33): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(213,53): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(216,28): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(219,31): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(220,25): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(222,45): error TS2339: Property 'tracks' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(223,41): error TS2339: Property 'tracks' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(224,39): error TS2339: Property 'lyricsStr' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(225,41): error TS2339: Property 'lyricsArray' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(227,34): error TS2304: Cannot find name 'obj'.
+src/scrapers/spotify.ts(238,37): error TS2339: Property 'totalSize' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(292,48): error TS2339: Property 'tracks' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(293,44): error TS2339: Property 'tracks' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(294,39): error TS2339: Property 'lyricsStr' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(295,41): error TS2339: Property 'lyricsArray' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(303,40): error TS2339: Property 'totalSize' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(351,45): error TS2339: Property 'audioUrl' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(352,41): error TS2339: Property 'size' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(354,39): error TS2339: Property 'lyricsStr' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(355,41): error TS2339: Property 'lyricsArray' does not exist on type 'unknown'.
+src/scrapers/spotify.ts(402,30): error TS2339: Property 'type' does not exist on type '{}'.
+src/scrapers/spotify.ts(403,30): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(404,30): error TS2339: Property 'duration' does not exist on type '{}'.
+src/scrapers/spotify.ts(405,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(406,30): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(407,83): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(414,30): error TS2339: Property 'artists' does not exist on type '{}'.
+src/scrapers/spotify.ts(416,30): error TS2339: Property 'type' does not exist on type '{}'.
+src/scrapers/spotify.ts(417,30): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(418,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(419,30): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(420,83): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(422,30): error TS2339: Property 'type' does not exist on type '{}'.
+src/scrapers/spotify.ts(423,30): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(424,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(425,30): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(426,71): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(435,30): error TS2339: Property 'artists' does not exist on type '{}'.
+src/scrapers/spotify.ts(437,30): error TS2339: Property 'type' does not exist on type '{}'.
+src/scrapers/spotify.ts(438,30): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(439,30): error TS2339: Property 'description' does not exist on type '{}'.
+src/scrapers/spotify.ts(440,30): error TS2339: Property 'owner' does not exist on type '{}'.
+src/scrapers/spotify.ts(441,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(442,30): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(443,79): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(450,28): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(451,28): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(452,28): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(453,28): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(454,28): error TS2339: Property 'year' does not exist on type '{}'.
+src/scrapers/spotify.ts(461,28): error TS2339: Property 'artists' does not exist on type '{}'.
+src/scrapers/spotify.ts(467,28): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(468,28): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(469,28): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(470,64): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(477,27): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(478,27): error TS2339: Property 'duration' does not exist on type '{}'.
+src/scrapers/spotify.ts(479,27): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(480,27): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(481,82): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/spotify.ts(488,27): error TS2339: Property 'artists' does not exist on type '{}'.
+src/scrapers/spotify.ts(495,30): error TS2339: Property 'type' does not exist on type '{}'.
+src/scrapers/spotify.ts(496,30): error TS2339: Property 'title' does not exist on type '{}'.
+src/scrapers/spotify.ts(497,30): error TS2339: Property 'description' does not exist on type '{}'.
+src/scrapers/spotify.ts(498,30): error TS2339: Property 'owner' does not exist on type '{}'.
+src/scrapers/spotify.ts(499,30): error TS2339: Property 'id' does not exist on type '{}'.
+src/scrapers/spotify.ts(500,30): error TS2339: Property 'url' does not exist on type '{}'.
+src/scrapers/spotify.ts(501,79): error TS2339: Property 'thumb' does not exist on type '{}'.
+src/scrapers/superimg.ts(5,273): error TS2872: This kind of expression is always truthy.
+src/scrapers/superimg.ts(5,1096): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/superimg.ts(5,1114): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/superimg.ts(5,1154): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/superimg.ts(5,1172): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/scrapers/superimg.ts(5,1721): error TS2872: This kind of expression is always truthy.
+src/scrapers/superimg.ts(5,2173): error TS2304: Cannot find name '_0x2bfb27'.
+src/scrapers/superimg.ts(5,2223): error TS2304: Cannot find name '_0x1dbeae'.
+src/scrapers/superimg.ts(5,2251): error TS2304: Cannot find name '_0x6f6dcf'.
+src/scrapers/superimg.ts(5,2615): error TS2872: This kind of expression is always truthy.
+src/scrapers/superimg.ts(5,3773): error TS2872: This kind of expression is always truthy.
+src/scrapers/superimg.ts(5,4302): error TS2304: Cannot find name '_0x3127f8'.
+src/scrapers/superimg.ts(5,4412): error TS2304: Cannot find name '_0x277aaf'.
+src/scrapers/superimg.ts(5,4433): error TS2304: Cannot find name '_0x94c764'.
+src/scrapers/superimg.ts(5,4443): error TS2304: Cannot find name '_0x487b23'.
+src/scrapers/superimg.ts(5,4464): error TS2304: Cannot find name '_0x4fd017'.
+src/scrapers/superimg.ts(5,4536): error TS2304: Cannot find name '_0x1487cb'.
+src/scrapers/superimg.ts(5,4575): error TS2304: Cannot find name '_0x25483e'.
+src/scrapers/superimg.ts(5,4720): error TS2304: Cannot find name '_0x2e8956'.
+src/scrapers/superimg.ts(5,4915): error TS2872: This kind of expression is always truthy.
+src/scrapers/superimg.ts(5,5503): error TS2630: Cannot assign to '_0x458b' because it is a function.
+src/scrapers/superimg.ts(5,7013): error TS2304: Cannot find name '_0x2a4d75'.
+src/scrapers/superimg.ts(5,7040): error TS2304: Cannot find name '_0x12868f'.
+src/scrapers/superimg.ts(5,7086): error TS2304: Cannot find name '_0x114fb5'.
+src/scrapers/superimg.ts(5,7114): error TS2304: Cannot find name '_0x428c28'.
+src/scrapers/superimg.ts(5,8586): error TS2630: Cannot assign to '_0x68c7' because it is a function.
+src/scrapers/tiktok.ts(5,32): error TS2307: Cannot find module 'got' or its corresponding type declarations.
+src/scrapers/tofigure.ts(27,5): error TS2339: Property 'prompt' does not exist on type '{}'.
+src/scrapers/videodowns.ts(10,6): error TS2339: Property 'axios' does not exist on type 'VideoDownsDownloader'.
+src/scrapers/videodowns.ts(11,6): error TS2339: Property 'FormData' does not exist on type 'VideoDownsDownloader'.
+src/scrapers/videodowns.ts(16,23): error TS2339: Property 'FormData' does not exist on type 'VideoDownsDownloader'.
+src/scrapers/videodowns.ts(24,6): error TS2339: Property 'axios' does not exist on type 'VideoDownsDownloader'.
+src/scrapers/y2mate.ts(13,28): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/scrapers/y2mate.ts(56,11): error TS2554: Expected 1 arguments, but got 0.
+src/scrapers/y2mate.ts(96,13): error TS2794: Expected 1 arguments, but got 0. Did you forget to include 'void' in your type argument to 'Promise'?
+src/scrapers/youtube.ts(40,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube.ts(78,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube.ts(128,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube.ts(177,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube.ts(186,17): error TS2304: Cannot find name 'res'.
+src/scrapers/youtube.ts(187,24): error TS2304: Cannot find name 'res'.
+src/scrapers/youtube.ts(193,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube.ts(202,17): error TS2304: Cannot find name 'res'.
+src/scrapers/youtube.ts(203,24): error TS2304: Cannot find name 'res'.
+src/scrapers/youtube.ts(209,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube2.ts(35,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube2.ts(73,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube2.ts(123,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube2.ts(172,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtube2.ts(181,17): error TS2304: Cannot find name 'res'.
+src/scrapers/youtube2.ts(182,24): error TS2304: Cannot find name 'res'.
+src/scrapers/youtube2.ts(188,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev1.ts(39,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev1.ts(77,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev1.ts(130,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev1.ts(182,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev1.ts(191,17): error TS2304: Cannot find name 'res'.
+src/scrapers/youtubev1.ts(192,24): error TS2304: Cannot find name 'res'.
+src/scrapers/youtubev1.ts(198,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev2.ts(17,28): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/scrapers/youtubev3.ts(43,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev3.ts(81,19): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev3.ts(131,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev3.ts(180,21): error TS2304: Cannot find name 'error'.
+src/scrapers/youtubev3.ts(189,17): error TS2304: Cannot find name 'res'.
+src/scrapers/youtubev3.ts(190,24): error TS2304: Cannot find name 'res'.
+src/scrapers/youtubev3.ts(196,21): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(40,19): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(78,19): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(131,21): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(180,21): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(229,21): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(233,16): error TS2393: Duplicate function implementation.
+src/scrapers/yt.ts(238,17): error TS2304: Cannot find name 'res'.
+src/scrapers/yt.ts(239,24): error TS2304: Cannot find name 'res'.
+src/scrapers/yt.ts(245,21): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(249,16): error TS2393: Duplicate function implementation.
+src/scrapers/yt.ts(253,1): error TS2304: Cannot find name 'res'.
+src/scrapers/yt.ts(254,8): error TS2304: Cannot find name 'res'.
+src/scrapers/yt.ts(259,13): error TS2304: Cannot find name 'error'.
+src/scrapers/yt.ts(268,17): error TS2304: Cannot find name 'res'.
+src/scrapers/yt.ts(269,24): error TS2304: Cannot find name 'res'.
+src/scrapers/yt.ts(275,21): error TS2304: Cannot find name 'error'.
+src/scrapers/ytdl4.ts(10,14): error TS2339: Property 'query' does not exist on type 'ScrapperData2'.
+src/scrapers/ytdl4.ts(29,75): error TS2339: Property 'query' does not exist on type 'ScrapperData2'.

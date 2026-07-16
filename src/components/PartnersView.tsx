@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Handshake, Terminal, Code2, Rocket, Globe, Plus, Trash2, Image as ImageIcon } from "lucide-react";
 
@@ -17,10 +16,14 @@ export function PartnersView() {
 
   const fetchPartners = () => {
     fetch("/api/partners")
-      .then(r => r.json())
+      .then(async r => {
+        if (!r.ok) return { success: false };
+        try { return await r.json(); } catch(e) { return { success: false }; }
+      })
       .then(d => {
-        if (d.success) setDbPartners(d.partners);
-      });
+        if (d && d.success) setDbPartners(d.partners || []);
+      })
+      .catch(console.error);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -153,7 +156,7 @@ export function PartnersView() {
                 </button>
               )}
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-white/5 rounded-2xl border border-white/5 group-hover:scale-110 transition-transform">
+                <div className="p-3 bg-white/5 rounded-2xl border border-white/5 group-hover:scale-110 transition-transform flex-shrink-0">
                   {renderIcon(p.icon_url, p.icon_url)}
                 </div>
                 <div>
@@ -161,7 +164,7 @@ export function PartnersView() {
                   <p className="text-xs font-mono text-indigo-400 mb-3">{p.role}</p>
                   <p className="text-sm text-zinc-400 leading-relaxed mb-4">{p.description}</p>
                   {p.link_url && p.link_url !== '#' && (
-                    <a href={p.link_url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold uppercase tracking-widest text-white hover:text-indigo-400 flex items-center gap-1 transition-colors">
+                    <a href={p.link_url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold uppercase tracking-widest text-white hover:text-indigo-400 flex items-center gap-1 transition-colors w-fit">
                       <Rocket className="w-3 h-3" /> Conhecer Projeto
                     </a>
                   )}

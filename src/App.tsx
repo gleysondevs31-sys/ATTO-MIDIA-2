@@ -22,6 +22,7 @@ import { ProfileView } from "./components/ProfileView";
 import { CommunityView } from "./components/CommunityView";
 import { PartnersView } from "./components/PartnersView";
 import { ImageBankView } from "./components/ImageBankView";
+import { PublicGalleryView } from "./components/PublicGalleryView";
 import { LandingPage } from "./components/LandingPage";
 import { AdminPanel } from "./components/AdminPanel";
 
@@ -35,6 +36,9 @@ import { ApiDocsView } from "./components/ApiDocsView";
 import { ScrapersDocsView } from "./components/ScrapersDocsView";
 
 export default function App() {
+
+  
+
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
@@ -44,7 +48,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   
   // Navigation View selection
-  const [currentView, setCurrentView] = useState<string>("landing");
+  const [currentView, setCurrentView] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("view") || "landing";
+  });
   const [legalTab, setLegalTab] = useState<"terms" | "privacy" | "conditions" | "links">("terms");
 
   // State synchronization for Spotify-style Now Playing view
@@ -65,6 +72,8 @@ export default function App() {
   } | null>(null);
 
   // Light/Dark Theme state (White is default)
+
+
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
       const saved = localStorage.getItem("atto-theme");
@@ -902,6 +911,12 @@ export default function App() {
               customPlatforms={customPlatforms}
               onRefreshPlatforms={fetchPlatforms}
             />
+          ) : currentView === "community" ? (
+            <CommunityView />
+          ) : currentView === "partners" ? (
+            <PartnersView />
+          ) : currentView === "image-bank" ? (
+            <ImageBankView />
           ) : (
             /* Dedicated Cinematic Video Player Page */
             <VideoPlayerPage

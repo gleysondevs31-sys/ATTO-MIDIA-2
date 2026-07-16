@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { 
-  Sparkles, Play, Flame, Compass, Heart, Shield, Database, Download, 
+  Sparkles, Code2, Play, Flame, Compass, Heart, Shield, Database, Download, 
   Music, ArrowRight, Video, List, Check, Search, Link, Cpu, HelpCircle, 
   TrendingUp, Globe, AlertTriangle, ArrowUpRight, Zap, Sun, Moon, Youtube, Instagram
 } from "lucide-react";
@@ -31,6 +31,7 @@ export function LandingPage({
 }: LandingPageProps) {
   const [searchValue, setSearchValue] = useState("");
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +124,43 @@ export function LandingPage({
               <span>PREÇOS / PRO</span>
             </button>
 
+            
+            
+            
+            {/* Burger Menu Button */}
+            <div className="relative">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 rounded-xl border border-white/10 bg-[#111111]/80 text-gray-300 hover:text-white hover:border-white/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-md hover:bg-primary/10 hover:text-primary"
+              >
+                <List className="w-5 h-5" />
+              </button>
+              
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-[#090909] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 flex flex-col py-1">
+                  <a 
+                    href="/gallery"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.history.pushState({}, "", "/gallery");
+                      window.dispatchEvent(new Event("popstate"));
+                    }}
+                    className="px-4 py-3 text-sm font-bold text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-3"
+                  >
+                    <Globe className="w-4 h-4 text-indigo-400" />
+                    Galeria Pública
+                  </a>
+                  <button 
+                    onClick={() => { setIsMenuOpen(false); onSelectView?.("api-docs"); }}
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-gray-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-3 cursor-pointer"
+                  >
+                    <Code2 className="w-4 h-4 text-emerald-400" />
+                    Doc da API
+                  </button>
+                </div>
+              )}
+            </div>
+            
             {/* Theme Toggle Button */}
             <button
               id="btn-landing-theme-toggle"

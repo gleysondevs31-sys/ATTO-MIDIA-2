@@ -27,7 +27,8 @@ router.post("/image", upload.single("image"), (req, res) => {
         return res.status(400).json({ error: "Nenhuma imagem enviada" });
     }
     const url = `/uploads/${req.file.filename}`;
-    res.json({ success: true, url });
+    const fullUrl = `${req.protocol}://${req.get("host")}${url}`;
+    res.json({ success: true, url, fullUrl });
 });
 
 // Image Bank Endpoint
